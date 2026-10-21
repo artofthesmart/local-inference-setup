@@ -28,33 +28,3 @@ jobs:
         run: |
           $null = [scriptblock]::Create((Get-Content -Raw install.ps1))
 
-  e2e:
-    needs: unit
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-      - run: go build -o copilot-local${{ runner.os == 'Windows' && '.exe' || '' }} ./cmd/copilot-local
-      - name: Set up Ollama (real install)
-        shell: bash
-        run: ./copilot-local ollama --yes
-      - name: Running again changes nothing
-        shell: bash
-        run: |
-          ./copilot-local ollama --yes | tee second.txt
-          grep -q "Everything is already set up" second.txt
-      - name: Check only
-        shell: bash
-        run: ./copilot-local ollama --check
-      - name: The API answers
-        shell: bash
-        run: curl -fsS http://127.0.0.1:11434/v1/models
-      - name: Undo
-        shell: bash
-        run: ./copilot-local ollama --undo --yes

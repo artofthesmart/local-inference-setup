@@ -90,4 +90,5 @@ Also: record the Go decision in `NOTES.md`, save this plan in the repo at `plans
 - **Cloud off on Linux with systemd uses `OLLAMA_NO_CLOUD=1` in our drop-in.** The service runs as the `ollama` user, so `~/.ollama/server.json` is ignored there. Other systems use `server.json` as planned.
 - **Added `--check`,** which only checks and changes nothing.
 - **WSL with Ollama on the Windows side:** the tool stops and asks the user to run it from Windows PowerShell, so it doesn't install a second copy.
+- **No end-to-end install test in CI.** It downloaded several GB of Ollama on every run, and Ollama's own installer is trusted to work. Unit tests cover every OS's commands. A one-time real run on all 3 OSes passed before this was removed.
 - **Code-signing for Windows is a follow-up.** Defender's ransomware ASR rule blocks the unsigned build on managed PCs.
