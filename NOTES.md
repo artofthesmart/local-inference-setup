@@ -16,6 +16,7 @@
 - **Copilot CLI:** use the native environment variables (`COPILOT_PROVIDER_*`) with `COPILOT_OFFLINE=true`. No proxy or workaround is needed.
 - Shared Ollama setup (context length and the cloud opt-out) lives once in the README. The platform guides link to it.
 - Commands are written as single copy-paste lines.
+- **Automation language: Go.** It builds one self-contained program per OS, so users need nothing installed first (no Python, no Bash on Windows). One codebase covers Linux, macOS, and Windows. Users get it from a one-line launcher (`curl … | sh` or `irm … | iex`). Plans live in [plans/](plans/), starting with [issue #2](plans/issue-2-ollama-setup.md).
 
 ## Notable findings
 
