@@ -4,12 +4,14 @@ package system
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"runtime"
 	"strings"
+	"time"
 )
 
 // Info describes the machine the tool is running on.
@@ -68,6 +70,8 @@ type Runner interface {
 	Run(ctx context.Context, c Cmd) (string, error)
 }
 
+const pipeWaitDelay = 3 * time.Second
+
 // ExecRunner runs commands for real.
 type ExecRunner struct {
 	Out io.Writer // where interactive output goes; defaults to os.Stdout
@@ -91,7 +95,12 @@ func (r ExecRunner) Run(ctx context.Context, c Cmd) (string, error) {
 	}
 	var buf bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &buf, &buf
+	// A started server can inherit our output pipe and keep it open forever, so stop waiting soon after the command itself exits.
+	cmd.WaitDelay = pipeWaitDelay
 	err := cmd.Run()
+	if errors.Is(err, exec.ErrWaitDelay) {
+		err = nil
+	}
 	out := strings.TrimSpace(buf.String())
 	if err != nil {
 		return out, fmt.Errorf("%s: %w: %s", c, err, out)

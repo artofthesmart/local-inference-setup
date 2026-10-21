@@ -2,7 +2,9 @@ package system
 
 import (
 	"context"
+	"runtime"
 	"testing"
+	"time"
 )
 
 func TestIsWSLVersion(t *testing.T) {
@@ -56,5 +58,18 @@ func TestExecRunnerReportsOutputOnError(t *testing.T) {
 	_, err := ExecRunner{}.Run(context.Background(), Cmd{Name: "definitely-not-a-real-command-xyz"})
 	if err == nil {
 		t.Fatal("want error")
+	}
+}
+
+func TestExecRunnerDoesNotHangOnBackgroundChild(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses sh")
+	}
+	start := time.Now()
+	if _, err := (ExecRunner{}).Run(t.Context(), Cmd{Name: "sh", Args: []string{"-c", "sleep 30 &"}}); err != nil {
+		t.Fatal(err)
+	}
+	if d := time.Since(start); d > 15*time.Second {
+		t.Fatalf("Run waited %v for a background child", d)
 	}
 }
