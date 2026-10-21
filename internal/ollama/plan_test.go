@@ -170,7 +170,7 @@ func TestMacOSSetup(t *testing.T) {
 		t.Error("LaunchAgent not written")
 	}
 	lines := te.runner.Lines()
-	for _, want := range []string{"launchctl setenv OLLAMA_CONTEXT_LENGTH 65536", `osascript -e "quit app \"Ollama\""`, "open -a Ollama"} {
+	for _, want := range []string{"launchctl setenv OLLAMA_CONTEXT_LENGTH 65536", `osascript -e "quit app \"Ollama\""`, "open /Applications/Ollama.app"} {
 		if !containsLine(lines, want) {
 			t.Errorf("missing %q in %v", want, lines)
 		}
@@ -332,4 +332,57 @@ func withoutManualRestart(steps []Step) []Step {
 		}
 	}
 	return out
+}
+
+func TestMacOSFallsBackToServeWhenAppDoesNotStartServer(t *testing.T) {
+	te := newTestEnv(t, macOS, true)
+	te.exists[macAppPath] = true
+	te.server.set(func(f *fakeOllama) { f.up = false })
+	applyAll(t, mustPlan(t, te.Env, 65536))
+	last := te.runner.Calls[len(te.runner.Calls)-1]
+	if last.Name != "sh" || !strings.Contains(last.String(), "OLLAMA_CONTEXT_LENGTH=65536 nohup '"+fakeBin+"' serve") {
+		t.Fatalf("want a direct `ollama serve` fallback, got %v", last)
+	}
+}
+
+func TestMacOSNoFallbackWhenAppStartsServer(t *testing.T) {
+	te := newTestEnv(t, macOS, true)
+	te.exists[macAppPath] = true
+	applyAll(t, mustPlan(t, te.Env, 65536))
+	for _, c := range te.runner.Calls {
+		if c.Name == "sh" {
+			t.Fatalf("server was up, so no fallback expected: %v", c)
+		}
+	}
+}
+
+func TestWindowsFallsBackToServeWhenAppDoesNotStartServer(t *testing.T) {
+	te := newTestEnv(t, windows, true)
+	te.server.set(func(f *fakeOllama) { f.up = false })
+	applyAll(t, mustPlan(t, te.Env, 65536))
+	last := te.runner.Calls[len(te.runner.Calls)-1]
+	script := last.Args[len(last.Args)-1]
+	for _, want := range []string{"-ArgumentList 'serve'", "-RedirectStandardError '" + te.serverLogPath() + "'", "$env:OLLAMA_CONTEXT_LENGTH = "} {
+		if !strings.Contains(script, want) {
+			t.Errorf("missing %q in fallback:\n%s", want, script)
+		}
+	}
+}
+
+func TestInstallerErrorIsToleratedWhenOllamaGotInstalled(t *testing.T) {
+	for _, installedAfter := range []bool{true, false} {
+		te := newTestEnv(t, macOS, false)
+		te.runner.Failures["sh "] = "Unable to find application named 'Ollama'"
+		steps := mustPlan(t, te.Env, 65536)
+		if installedAfter {
+			te.LookPath = func(string) (string, error) { return fakeBin, nil }
+		}
+		err := steps[0].Apply(t.Context())
+		if installedAfter && err != nil {
+			t.Errorf("Ollama is installed, so the installer's error should be tolerated: %v", err)
+		}
+		if !installedAfter && err == nil {
+			t.Error("Ollama isn't installed, so the installer's error must be reported")
+		}
+	}
 }

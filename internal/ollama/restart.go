@@ -29,11 +29,18 @@ func restartStep(e *Env, s *State, want int) Step {
 	case e.Info.OS == "darwin" && s.MacApp:
 		return Step{
 			Title:   title,
-			Details: []string{`osascript -e 'quit app "Ollama"'`, "open -a Ollama"},
+			Details: []string{`osascript -e 'quit app "Ollama"'`, "open " + macAppPath},
 			Apply: func(ctx context.Context) error {
 				_, _ = e.Runner.Run(ctx, system.Cmd{Name: "osascript", Args: []string{"-e", `quit app "Ollama"`}})
 				e.sleep(3 * time.Second)
-				_, err := e.Runner.Run(ctx, system.Cmd{Name: "open", Args: []string{"-a", "Ollama"}})
+				// Opening by path works even before macOS has registered a newly installed app.
+				_, err := e.Runner.Run(ctx, system.Cmd{Name: "open", Args: []string{macAppPath}})
+				if err == nil && waitFor(ctx, e, appStartWait) {
+					return nil
+				}
+				// No desktop session (for example over SSH), so run the server directly.
+				fmt.Fprintln(e.Out, "  The Ollama app didn't start the server, so starting `ollama serve` directly.")
+				_, err = e.Runner.Run(ctx, serveInBackground(e, s, want))
 				return err
 			},
 		}
@@ -43,7 +50,15 @@ func restartStep(e *Env, s *State, want int) Step {
 			Title:   title,
 			Details: []string{"Stop Ollama and start it again from " + windowsDir(e, s)},
 			Apply: func(ctx context.Context) error {
-				_, err := e.Runner.Run(ctx, c)
+				if _, err := e.Runner.Run(ctx, c); err != nil {
+					return err
+				}
+				if waitFor(ctx, e, appStartWait) {
+					return nil
+				}
+				// No desktop session (for example over SSH), so run the server directly.
+				fmt.Fprintln(e.Out, "  The Ollama app didn't start the server, so starting `ollama serve` directly.")
+				_, err := e.Runner.Run(ctx, powershell(windowsServeScript(e, s)))
 				return err
 			},
 		}
@@ -61,6 +76,18 @@ func restartStep(e *Env, s *State, want int) Step {
 			return err
 		}}
 	}
+}
+
+// appStartWait is how long to give a desktop app to start its server before running `ollama serve` directly.
+const appStartWait = 20 * time.Second
+
+func waitFor(ctx context.Context, e *Env, d time.Duration) bool {
+	saved := e.WaitTimeout
+	defer func() { e.WaitTimeout = saved }()
+	if d < e.WaitTimeout {
+		e.WaitTimeout = d
+	}
+	return WaitForServer(ctx, e)
 }
 
 // serveInBackground starts `ollama serve` detached, logging to ~/.ollama/logs/server.log like the desktop apps do.
@@ -97,6 +124,18 @@ func windowsRestartScript(e *Env, s *State) string {
 	}, "; ")
 }
 
+// windowsServeScript starts `ollama.exe serve` hidden with the user's context setting, logging where the app would so verification can read it.
+func windowsServeScript(e *Env, s *State) string {
+	dir := strings.ReplaceAll(windowsDir(e, s), "'", "''")
+	log := strings.ReplaceAll(e.serverLogPath(), "'", "''")
+	return strings.Join([]string{
+		fmt.Sprintf("$env:%s = [Environment]::GetEnvironmentVariable('%s','User')", envContext, envContext),
+		fmt.Sprintf("$exe = Join-Path '%s' 'ollama.exe'", dir),
+		fmt.Sprintf("New-Item -ItemType Directory -Force -Path (Split-Path '%s') | Out-Null", log),
+		fmt.Sprintf("try { Start-Process -FilePath $exe -ArgumentList 'serve' -WindowStyle Hidden -RedirectStandardError '%s' -RedirectStandardOutput '%s.out' } catch { Start-Process -FilePath $exe -ArgumentList 'serve' -WindowStyle Hidden }", log, log),
+	}, "; ")
+}
+
 func installStep(e *Env) Step {
 	url := e.InstallScriptURL(e.Info.OS)
 	return Step{
@@ -113,7 +152,11 @@ func installStep(e *Env) Step {
 			if e.Info.OS == "windows" {
 				c = system.Cmd{Name: "powershell", Args: []string{"-NoProfile", "-ExecutionPolicy", "Bypass", "-File", path}, Interactive: true}
 			}
-			_, err = e.Runner.Run(ctx, c)
+			if _, err = e.Runner.Run(ctx, c); err != nil && e.findBinary() != "" {
+				// Some installers fail on a last cosmetic step (like opening the app) after Ollama is in place.
+				fmt.Fprintln(e.Out, "  The installer reported a problem, but Ollama is installed, so continuing.")
+				return nil
+			}
 			return err
 		},
 	}
