@@ -13,13 +13,13 @@ Running it again is safe: if everything is already set, it changes nothing.
 
 ## Command shape
 
-- `copilot-local` with no arguments opens the guided menu (later issues add steps to it).
+- `copilot-local` with no arguments opens the guided menu (later issues add steps to it like model selection).
 - `copilot-local ollama` runs only this step.
-- Flags: `--context 65536` (default 64k), `--yes` (no prompts), `--dry-run`, `--undo`, `--skip-install`.
+- Flags: `--context 65536` (default 64k), `--yes` (no prompts), `--dry-run`, `--undo`, `--skip-install`, `--help` (including a link to the repo).
 
 ## Steps
 
-1. **Detect:** the OS, CPU architecture, and WSL. Check whether Ollama is installed (`ollama --version` and the default install paths). Check whether the server answers at `127.0.0.1:11434/api/version`. On Linux, check whether systemd manages Ollama.
+1. **Detect:** the OS, CPU architecture, RAM/VRAM, WSL, and other system details. Check whether Ollama is installed (`ollama --version` and the default install paths). Check whether the server answers at `127.0.0.1:11434/api/version`. On Linux, check whether systemd manages Ollama.
 2. **Install** (only if missing, after the user confirms): run Ollama's official installers so they keep owning GPU drivers, services, and PATH. Linux and macOS use `https://ollama.com/install.sh`. Windows uses `https://ollama.com/install.ps1`. We download to a temp file first, rather than piping into a shell.
 3. **Configure:**
    - **Cloud off, the same on every OS:** merge `"disable_ollama_cloud": true` into `~/.ollama/server.json`. This keeps other keys, makes a backup first, and needs no admin rights.
@@ -56,7 +56,6 @@ The guided menu uses charmbracelet/huh. Because every command goes through `Runn
   - Re-running changes nothing.
   - Undo restores the original state.
   - The exact commands run on each OS.
-- **End-to-end tests,** in GitHub Actions on all 3 OSes: run `copilot-local ollama --yes` on a clean runner. Then confirm the server answers, `/v1/models` works, and the log shows both settings. Run it again to confirm nothing changes, then run `--undo`. No model download is needed, so CPU-only runners are fine.
 
 ## Distribution
 
@@ -65,13 +64,13 @@ GoReleaser builds programs for Linux, macOS, and Windows on both x64 and arm64. 
 - Mac and Linux: `curl -fsSL …/install.sh | sh`
 - Windows: `irm …/install.ps1 | iex`
 
-That small launcher downloads the right program, checks its checksum, and runs it. Nothing is installed globally. The README gets a "Quick start (automated)" section.
+That small launcher downloads the right program, checks its checksum, and runs it. Nothing is installed globally (except Ollama). The README gets a "Quick start (automated)" section.
 
 ## Open questions
 
-- **WSL:** if Ollama already runs on the Windows side, configure that one rather than installing a second copy in WSL? Proposed answer: yes, and ask the user if it's unclear.
+- **WSL:** if Ollama already runs on the Windows side, configure that one rather than installing a second copy in WSL? Answer: Ask the user which environment they plan to use, default to using the Windows hosted Ollama instance.
 - **Existing `OLLAMA_HOST=0.0.0.0`:** leave it alone, but warn that the server is exposed to the network.
-- **Private repo:** the one-line installers need a public repo or public releases. Make the repo public before the first release.
+- **Private repo:** the one-line installers need a public repo or public releases. This repo will be made public before release.
 
 ## Order of work
 
@@ -82,6 +81,14 @@ That small launcher downloads the right program, checks its checksum, and runs i
 5. Install via the official scripts.
 6. `--undo` and `--dry-run`.
 7. GoReleaser, the launcher scripts, and the README quick start.
-8. End-to-end CI on 3 OSes.
 
 Also: record the Go decision in `NOTES.md`, save this plan in the repo at `plans/issue-2-ollama-setup.md`, and link it from issue #2.
+
+## Changes made while building
+
+- **Choosing per-OS behavior at runtime, not compile time.** Behavior depends on the detected OS rather than Go build tags. Because of that, every OS's commands are unit-tested on every OS. Windows settings go through PowerShell via `Runner`.
+- **Cloud off on Linux with systemd uses `OLLAMA_NO_CLOUD=1` in our drop-in.** The service runs as the `ollama` user, so `~/.ollama/server.json` is ignored there. Other systems use `server.json` as planned.
+- **Added `--check`,** which only checks and changes nothing.
+- **WSL with Ollama on the Windows side:** the tool stops and asks the user to run it from Windows PowerShell, so it doesn't install a second copy.
+- **The end-to-end install test runs on demand only** (`.github/workflows/e2e.yml`). It downloads several GB of Ollama, so it doesn't run on every push. Unit tests cover every OS's commands. Start it from the Actions tab, or with `gh workflow run e2e.yml --ref <branch>`.
+- **Code-signing for Windows is a follow-up.** Defender's ransomware ASR rule blocks the unsigned build on managed PCs.
