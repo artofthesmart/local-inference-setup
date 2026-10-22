@@ -16,6 +16,7 @@
 - **Copilot CLI:** use the native environment variables (`COPILOT_PROVIDER_*`) with `COPILOT_OFFLINE=true`. No proxy or workaround is needed.
 - Shared Ollama setup (context length and the cloud opt-out) lives once in the README. The platform guides link to it.
 - Commands are written as single copy-paste lines.
+- **Automation language: Go.** It builds one self-contained program per OS, so users need nothing installed first (no Python, no Bash on Windows). One codebase covers Linux, macOS, and Windows. Users get it from a one-line launcher (`curl … | sh` or `irm … | iex`). Plans live in [plans/](plans/), starting with [issue #2](plans/issue-2-ollama-setup.md).
 
 ## Notable findings
 
@@ -24,6 +25,14 @@
 - `llama-server`'s default port is now `9931`, so the guides always pass `--port`.
 - In VS Code, inline completions and semantic search always use GitHub. Only chat and utility tasks can be local.
 - Ollama's default context window, as small as 4k, is far too small for agents. Set `OLLAMA_CONTEXT_LENGTH`.
+
+## Findings from building `copilot-local` (issue #2)
+
+- Linux systemd: Ollama runs as the `ollama` user (home `/usr/share/ollama`), so `~/.ollama/server.json` is ignored. The tool turns off cloud with `OLLAMA_NO_CLOUD=1` in its own drop-in, `/etc/systemd/system/ollama.service.d/50-copilot-local.conf`. An `override.conf` from `systemctl edit` sorts later and wins, and `--check` points this out.
+- macOS: `launchctl setenv` is lost on reboot. The tool adds a LaunchAgent (`com.copilot-local.ollama-env`) that reapplies it at login.
+- Windows: the tool sets a user environment variable rather than using `setx`. When it restarts Ollama, it copies the new value into the restart process, because child processes otherwise inherit the old environment.
+- `GET /api/status` reports whether Ollama cloud is off. That's how the tool checks it.
+- Work-managed Windows PCs: Defender's ASR rule "Use advanced protection against ransomware" (`C1DB55AB-C21A-4637-BB3F-A12568109D35`) blocks the unsigned `copilot-local.exe` after it's downloaded. Code-signing the Windows build fixes this.
 
 ## Open questions and unverified items
 
