@@ -51,6 +51,7 @@ func TestHelp(t *testing.T) {
 		"copilot-local model adds":            {{"help", "model"}, {"model", "--help"}, {"model", "-h"}},
 		"copilot-local configure saves":       {{"help", "configure"}, {"configure", "--help"}},
 		"copilot-local vscode installs":       {{"help", "vscode"}, {"vscode", "--help"}},
+		"copilot-local verify checks":         {{"help", "verify"}, {"verify", "--help"}},
 		"copilot-local ollama installs":       {{"help", "ollama"}, {"ollama", "--help"}},
 	}
 	for want, argSets := range cases {

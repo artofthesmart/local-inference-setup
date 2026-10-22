@@ -58,6 +58,8 @@ func run(ctx context.Context, args []string, out io.Writer) int {
 		return runConfigure(ctx, args[1:], out)
 	case "vscode":
 		return runVSCode(ctx, args[1:], out)
+	case "verify":
+		return runVerify(ctx, args[1:], out)
 	case "ollama":
 		f, err := parseOllamaFlags(args[1:], out)
 		if err != nil {

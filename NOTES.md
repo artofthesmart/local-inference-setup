@@ -63,5 +63,6 @@
 - ~~A cross-platform script that checks for and installs Ollama, sets `OLLAMA_CONTEXT_LENGTH` and `OLLAMA_NO_CLOUD`, pulls a tool-capable model, and checks `ollama show` for tool support.~~ Done in #2 and #3.
 - VS Code: install `Ollama.ollama` and merge the privacy and BYOK keys into the user `settings.json`.
 - ~~Copilot CLI: save the local provider environment settings and disable auto-update.~~ Done in #4 with `copilot-local configure`; see [the Copilot CLI guide](docs/copilot-cli.md#step-4-make-it-permanent).
+- ~~End-to-end setup check with pass/fail results and fixes.~~ Implemented for #6 with `copilot-local verify`: reuses Ollama/model checks, tests a real offline Copilot prompt in isolated temporary settings, checks actual loaded context and VS Code profile settings/extensions, and prints Desktop manual steps. `--skip-vscode` supports CLI-only setups. This is not a network-privacy audit.
 - GitHub Desktop: no reliable automation, because settings live in app-internal storage. Provide a checklist, plus optional hosts-file blocking for the telemetry hosts.
 - llama.cpp: a helper that starts `llama-server` with the right flags and prints the matching client config for each platform.
