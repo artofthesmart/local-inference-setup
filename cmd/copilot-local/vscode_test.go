@@ -24,7 +24,11 @@ func fakeVSCode(t *testing.T) (string, *system.FakeRunner) {
 }
 
 func vscodeSettingsPath(home string) string {
-	return filepath.Join(home, ".config", "Code", "User", "settings.json")
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		configDir = filepath.Join(home, ".config")
+	}
+	return filepath.Join(configDir, "Code", "User", "settings.json")
 }
 
 func saveVSCodeProfile(t *testing.T, home, name, location string) {
@@ -193,7 +197,7 @@ func TestVSCodeSetupUsesSelectedProfileAndDefaultForApplicationSettings(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	workSettingsPath := filepath.Join(home, ".config", "Code", "User", "profiles", "profile-id", "settings.json")
+	workSettingsPath := filepath.Join(filepath.Dir(vscodeSettingsPath(home)), "profiles", "profile-id", "settings.json")
 	workSettings, err := os.ReadFile(workSettingsPath)
 	if err != nil {
 		t.Fatal(err)

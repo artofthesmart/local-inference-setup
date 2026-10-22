@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -165,8 +166,11 @@ func TestWriteSettingsBacksUpOnlyActualChanges(t *testing.T) {
 		t.Fatalf("backup contents: %q, %v", backedUp, err)
 	}
 	mode, err := os.Stat(path)
-	if err != nil || mode.Mode().Perm() != 0o640 {
-		t.Fatalf("settings permissions: %v, %v", mode, err)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if runtime.GOOS != "windows" && mode.Mode().Perm() != 0o640 {
+		t.Fatalf("settings permissions: %v", mode.Mode().Perm())
 	}
 	if _, err := WriteSettings(path, updated, updated); err != nil {
 		t.Fatal(err)
