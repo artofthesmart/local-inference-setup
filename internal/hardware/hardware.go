@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -290,11 +291,16 @@ func freeDisk(ctx context.Context, d Deps) uint64 {
 		return v
 	}
 	// df needs a folder that exists, so walk up until one does.
-	for dir != "/" && dir != "." {
+	for {
 		if _, err := d.Stat(dir); err == nil {
 			break
 		}
-		dir = filepath.Dir(dir)
+		// Unix paths only here, so use forward slashes even when tests run on Windows.
+		parent := path.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
 	}
 	out, err := d.Runner.Run(ctx, system.Cmd{Name: "df", Args: []string{"-Pk", dir}})
 	if err != nil {
