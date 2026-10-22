@@ -4,6 +4,12 @@ GitHub Copilot CLI (the `copilot` command) has built-in support for your own mod
 
 This guide was checked against Copilot CLI 1.0.101 (`copilot help providers`, `copilot help environment`, `copilot help config`) and the [official BYOK docs](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/use-byok-models). The setup was also tested end to end against a mock server, using a fresh config directory and no GitHub login.
 
+## The easy way: `copilot-local`
+
+Run the one-line command from the [README Quick start](../README.md#quick-start-automated). It sets up Ollama, picks and tests a model that fits your computer, and starts Copilot with the offline settings below, for that run only. Next time, run it again and press Enter to reuse your last model. It doesn't change your shell profile, so plain `copilot` still uses GitHub.
+
+The rest of this guide does the same thing by hand, and covers making the settings permanent.
+
 ## What runs where
 
 | Feature | Local with this setup? |

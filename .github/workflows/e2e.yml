@@ -1,6 +1,6 @@
 name: e2e
 
-# Really installs Ollama (several GB) on each OS, so it only runs when started by hand:
+# Really installs Ollama and a small model (several GB) on each OS, so it only runs when started by hand:
 # Actions tab > e2e > Run workflow, or: gh workflow run e2e.yml --ref <branch>
 on:
   workflow_dispatch:
@@ -20,18 +20,32 @@ jobs:
       - run: go build -o copilot-local${{ runner.os == 'Windows' && '.exe' || '' }} ./cmd/copilot-local
       - name: Set up Ollama (real install)
         shell: bash
-        run: ./copilot-local ollama --yes
+        run: ./copilot-local ollama --yes --context 32768
       - name: Running again changes nothing
         shell: bash
         run: |
-          ./copilot-local ollama --yes | tee second.txt
+          ./copilot-local ollama --yes --context 32768 | tee second.txt
           grep -q "Everything is already set up" second.txt
       - name: Check only
         shell: bash
-        run: ./copilot-local ollama --check
+        run: ./copilot-local ollama --check --context 32768
       - name: The API answers
         shell: bash
         run: curl -fsS http://127.0.0.1:11434/v1/models
+      - name: Download and test a small model
+        shell: bash
+        run: ./copilot-local model --model qwen3:1.7b --context 32768 --yes
+      - name: Launch passes the local settings to Copilot
+        shell: bash
+        run: |
+          mkdir stub
+          printf '#!/bin/sh\nenv | grep -E "^COPILOT_" > "%s/launched.txt"\n' "$PWD" > stub/copilot
+          chmod +x stub/copilot
+          if [ "$RUNNER_OS" = Windows ]; then printf '@echo off\r\nset COPILOT_ > "%s\\launched.txt"\r\n' "$(cygpath -w "$PWD")" > stub/copilot.cmd; fi
+          PATH="$PWD/stub:$PATH" ./copilot-local --yes
+          cat launched.txt
+          grep -q "COPILOT_OFFLINE=true" launched.txt
+          grep -q "COPILOT_MODEL=qwen3:1.7b" launched.txt
       - name: Undo
         shell: bash
         run: ./copilot-local ollama --undo --yes

@@ -14,22 +14,34 @@ Each guide ends with an **Advanced** section on switching from Ollama to [llama.
 
 ## Quick start (automated)
 
-The `copilot-local` tool installs Ollama if needed, sets the context length, turns off Ollama cloud, restarts Ollama, and checks that it all worked. It shows every change and asks before making it. Running it again is safe.
+The `copilot-local` tool starts Copilot CLI on a model running on your own computer. The first time, it sets everything up for you and asks once before changing anything:
+
+1. Installs Ollama if needed, sets a big enough context size, and turns off Ollama cloud.
+2. Checks your memory and graphics card, and picks the best model that fits from a [tested list](internal/models/shortlist.txt). The list runs from 8 GB laptops up to 48 GB graphics cards and 128 GB Macs. Extra mid-size and large models can be chosen from the menu.
+3. Downloads the model and tests that it can really call tools, the way Copilot does.
+4. Starts Copilot, connected only to that model.
+
+After that, it shows a short menu with the model you used last at the top, so you just press Enter.
 
 - **macOS and Linux:** `curl -fsSL https://raw.githubusercontent.com/artofthesmart/local-inference-setup/main/install.sh | sh`
 - **Windows (PowerShell):** `irm https://raw.githubusercontent.com/artofthesmart/local-inference-setup/main/install.ps1 | iex`
 
-Each command downloads the right program for your computer, checks its checksum, and runs it from a temporary folder. Nothing gets installed except Ollama itself.
+Each command downloads the right program for your computer, checks its checksum, and runs it from a temporary folder. Nothing gets installed except Ollama and the model. You need [Copilot CLI](docs/copilot-cli.md#requirements) installed first.
 
-Useful options, for example `curl -fsSL …/install.sh | sh -s -- ollama --dry-run`:
+Useful options, for example `curl -fsSL …/install.sh | sh -s -- model --ask-gemini`:
 
 | Option | What it does |
 | --- | --- |
-| `ollama --dry-run` | Show what would change, and change nothing |
-| `ollama --check` | Only check the current setup |
+| `--model gpt-oss:20b` | Start Copilot with this model (it's downloaded and tested first if needed) |
+| `-- -p "fix the tests"` | Pass anything after `--` to Copilot |
+| `model` | Add, change, or re-test a model |
+| `model --ask-gemini` | Make a prompt about your computer to ask Gemini which model to use, then paste back its answer |
+| `model --check` | Re-test the model you used last |
+| `ollama --dry-run` | Show what the Ollama setup would change, and change nothing |
 | `ollama --context 131072` | Use a different context length (default 65536) |
-| `ollama --undo` | Remove the settings the tool added (Ollama stays installed) |
-| `ollama --yes` | Don't ask questions (for scripts) |
+| `ollama --undo` | Remove the Ollama settings the tool added (Ollama stays installed) |
+| `--yes` | Don't ask questions (for scripts) |
+| `--help` | Help for any command, for example `model --help` |
 
 > [!NOTE]
 > On some work-managed Windows PCs, Microsoft Defender's ransomware protection blocks new, unsigned programs, and you'll see "Access is denied". Use the manual steps below, or ask your IT team. Signed Windows builds are tracked in the issues.

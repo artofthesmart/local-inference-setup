@@ -22,24 +22,6 @@ import (
 // version is set at release time.
 var version = "dev"
 
-const usage = `copilot-local sets up GitHub Copilot to run on local AI models.
-
-Usage:
-  copilot-local                 Open the guided menu
-  copilot-local ollama [flags]  Install Ollama and tune it for Copilot
-  copilot-local version         Print the version
-
-Flags for "ollama":
-  --context N     Context length in tokens (default 65536)
-  --yes           Don't ask before making changes
-  --dry-run       Show what would change, and change nothing
-  --check         Only check the current setup, and change nothing
-  --undo          Remove the settings this tool added (Ollama stays installed)
-  --skip-install  Don't install Ollama if it's missing
-
-Guides: https://github.com/artofthesmart/local-inference-setup
-`
-
 var (
 	bold  = lipgloss.NewStyle().Bold(true)
 	green = lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Bold(true)
@@ -55,6 +37,8 @@ type ollamaFlags struct {
 	check       bool
 	undo        bool
 	skipInstall bool
+	// doneMsg replaces the closing message, for first-time setup.
+	doneMsg string
 }
 
 func main() {
@@ -64,10 +48,12 @@ func main() {
 }
 
 func run(ctx context.Context, args []string, out io.Writer) int {
-	if len(args) == 0 {
-		return menu(ctx, out)
+	if len(args) == 0 || (strings.HasPrefix(args[0], "-") && !isHelpFlag(args[0]) && args[0] != "--version") {
+		return runLaunch(ctx, args, out)
 	}
 	switch args[0] {
+	case "model":
+		return runModel(ctx, args[1:], out)
 	case "ollama":
 		f, err := parseOllamaFlags(args[1:], out)
 		if err != nil {
@@ -80,87 +66,63 @@ func run(ctx context.Context, args []string, out io.Writer) int {
 	case "version", "--version":
 		fmt.Fprintln(out, "copilot-local", version)
 		return 0
-	case "help", "-h", "--help":
-		fmt.Fprint(out, usage)
+	case "help", "-h", "-help", "--help":
+		topic := ""
+		if args[0] == "help" && len(args) > 1 {
+			topic = args[1]
+		}
+		h := helpFor(topic, shortlistPath())
+		if h == "" {
+			fmt.Fprintf(out, "No help for %q.\n\n%s", topic, topUsage)
+			return 2
+		}
+		fmt.Fprint(out, h)
 		return 0
 	default:
-		fmt.Fprintf(out, "Unknown command %q.\n\n%s", args[0], usage)
+		fmt.Fprintf(out, "Unknown command %q.\n\n%s", args[0], topUsage)
 		return 2
 	}
 }
 
-func parseOllamaFlags(args []string, out io.Writer) (ollamaFlags, error) {
-	var f ollamaFlags
-	fs := flag.NewFlagSet("ollama", flag.ContinueOnError)
-	fs.SetOutput(out)
-	fs.Usage = func() { fmt.Fprint(out, usage) }
+func isHelpFlag(s string) bool {
+	return s == "-h" || s == "-help" || s == "--help"
+}
+
+func newOllamaFlags(out io.Writer) (*flag.FlagSet, *ollamaFlags) {
+	f := &ollamaFlags{}
+	fs := newFlagSet("ollama", helpFor("ollama", ""), out)
 	fs.IntVar(&f.context, "context", ollama.DefaultContextLength, "context length")
 	fs.BoolVar(&f.yes, "yes", false, "don't ask")
 	fs.BoolVar(&f.dryRun, "dry-run", false, "show changes only")
 	fs.BoolVar(&f.check, "check", false, "check only")
 	fs.BoolVar(&f.undo, "undo", false, "remove our settings")
 	fs.BoolVar(&f.skipInstall, "skip-install", false, "don't install Ollama")
+	return fs, f
+}
+
+func parseOllamaFlags(args []string, out io.Writer) (ollamaFlags, error) {
+	fs, f := newOllamaFlags(out)
 	if err := fs.Parse(args); err != nil {
-		return f, err
+		return *f, err
 	}
 	if f.context < 2048 {
 		fmt.Fprintln(out, "--context must be at least 2048.")
-		return f, errors.New("bad context")
+		return *f, errors.New("bad context")
 	}
-	return f, nil
+	return *f, nil
 }
 
-func interactive() bool {
+// interactive is replaced in tests.
+var interactive = func() bool {
 	return term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
 }
 
-func menu(ctx context.Context, out io.Writer) int {
-	if !interactive() {
-		fmt.Fprint(out, usage)
-		return 2
-	}
-	var choice string
-	ctxLen := fmt.Sprint(ollama.DefaultContextLength)
-	form := huh.NewForm(huh.NewGroup(
-		huh.NewSelect[string]().
-			Title("What would you like to do?").
-			Options(
-				huh.NewOption("Set up Ollama for Copilot (install if needed, tune settings)", "setup"),
-				huh.NewOption("Preview the Ollama changes without making them", "dry-run"),
-				huh.NewOption("Undo the Ollama changes this tool made", "undo"),
-				huh.NewOption("Quit", "quit"),
-			).
-			Value(&choice),
-	), huh.NewGroup(
-		huh.NewSelect[string]().
-			Title("How much context should Ollama give each model?").
-			Description("Copilot's agents need a lot. Bigger uses more memory.").
-			Options(
-				huh.NewOption("32k: smaller computers (16 GB of memory or less)", "32768"),
-				huh.NewOption("64k: recommended", "65536"),
-				huh.NewOption("128k: big GPUs (24 GB of video memory or more)", "131072"),
-			).
-			Value(&ctxLen),
-	).WithHideFunc(func() bool { return choice == "undo" || choice == "quit" }))
-	if err := form.RunWithContext(ctx); err != nil {
-		return 130
-	}
-	f := ollamaFlags{context: ollama.DefaultContextLength}
-	fmt.Sscan(ctxLen, &f.context)
-	switch choice {
-	case "setup":
-	case "dry-run":
-		f.dryRun = true
-	case "undo":
-		f.undo = true
-	default:
-		return 0
-	}
-	return runOllama(ctx, f, out)
-}
-
 func runOllama(ctx context.Context, f ollamaFlags, out io.Writer) int {
-	e, err := ollama.NewEnv(out)
+	done := ollamaReady
+	if f.doneMsg != "" {
+		done = f.doneMsg
+	}
+	e, err := newEnv(out)
 	if err != nil {
 		fmt.Fprintln(out, red.Render("Error:"), err)
 		return 1
@@ -169,7 +131,7 @@ func runOllama(ctx context.Context, f ollamaFlags, out io.Writer) int {
 		// Nothing was restarted, so there's no need to wait long for the server.
 		e.WaitTimeout = 2 * time.Second
 		fmt.Fprintln(out, bold.Render("Checking Ollama..."))
-		return report(out, ollama.Verify(ctx, e, f.context))
+		return report(out, ollama.Verify(ctx, e, f.context), done)
 	}
 	fmt.Fprintln(out, bold.Render("Checking your computer..."))
 	s, err := ollama.Detect(ctx, e)
@@ -195,7 +157,7 @@ func runOllama(ctx context.Context, f ollamaFlags, out io.Writer) int {
 		if len(steps) == 0 {
 			e.WaitTimeout = 2 * time.Second
 			fmt.Fprintln(out, "\n"+green.Render("Everything is already set up.")+" Checking it works...")
-			return report(out, ollama.Verify(ctx, e, f.context))
+			return report(out, ollama.Verify(ctx, e, f.context), done)
 		}
 	}
 
@@ -241,7 +203,7 @@ func runOllama(ctx context.Context, f ollamaFlags, out io.Writer) int {
 		return 0
 	}
 	fmt.Fprintln(out, "\n"+bold.Render("Checking it works..."))
-	return report(out, ollama.Verify(ctx, e, f.context))
+	return report(out, ollama.Verify(ctx, e, f.context), done)
 }
 
 func printState(out io.Writer, e *ollama.Env, s *ollama.State) {
@@ -292,7 +254,9 @@ func apply(ctx context.Context, out io.Writer, steps []ollama.Step) int {
 	return 0
 }
 
-func report(out io.Writer, r ollama.Report) int {
+const ollamaReady = "Ollama is ready for Copilot. Next: run `copilot-local` to pick a model and start Copilot."
+
+func report(out io.Writer, r ollama.Report, okMsg string) int {
 	for _, c := range r.Checks {
 		tag := map[ollama.Status]lipgloss.Style{ollama.Pass: green, ollama.Warn: amber, ollama.Fail: red}[c.Status].Render(c.Status.String())
 		fmt.Fprintf(out, "  %s  %s", tag, c.Name)
@@ -308,6 +272,8 @@ func report(out io.Writer, r ollama.Report) int {
 		fmt.Fprintln(out, "\n"+red.Render("Some checks failed.")+" Try the fixes above, then run again.")
 		return 1
 	}
-	fmt.Fprintln(out, "\n"+green.Render("Ollama is ready for Copilot.")+" Next: pull a model (see the README).")
+	if okMsg != "" {
+		fmt.Fprintln(out, "\n"+green.Render(okMsg))
+	}
 	return 0
 }
