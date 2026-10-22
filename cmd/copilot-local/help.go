@@ -27,6 +27,7 @@ Flags:
 
 Commands:
   model     Add, change, or re-test a model (can ask Gemini to help you choose)
+  configure Save the local model settings for future terminals
   ollama    Install Ollama and tune it for Copilot (part of first-time setup)
   version   Print the version
   help      Show help for a command, for example: copilot-local help model
@@ -82,6 +83,15 @@ Flags:
   --skip-install  Don't install Ollama if it's missing
 `
 
+const configureUsage = `copilot-local configure saves your selected local model settings for future terminals.
+
+Usage:
+  copilot-local configure
+
+It writes the offline provider settings to both ~/.bashrc and ~/.zshrc on macOS/Linux,
+or saves them with setx on Windows. It also disables Copilot CLI auto-update. Safe to re-run.
+`
+
 // helpFor returns the help text for a command, or "" if there's no such command.
 func helpFor(cmd, shortlistPath string) string {
 	switch cmd {
@@ -89,6 +99,8 @@ func helpFor(cmd, shortlistPath string) string {
 		return topUsage
 	case "model":
 		return fmt.Sprintf(modelUsage, shortlistPath)
+	case "configure":
+		return configureUsage + "\nGuides: " + guideURL + "\n"
 	case "ollama":
 		return ollamaUsage + "\nGuides: " + guideURL + "\n"
 	case "version":

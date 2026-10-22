@@ -49,6 +49,7 @@ func TestHelp(t *testing.T) {
 	cases := map[string][][]string{
 		"Start Copilot with a specific model": {{"help"}, {"--help"}, {"-h"}, {"--help", "extra"}},
 		"copilot-local model adds":            {{"help", "model"}, {"model", "--help"}, {"model", "-h"}},
+		"copilot-local configure saves":       {{"help", "configure"}, {"configure", "--help"}},
 		"copilot-local ollama installs":       {{"help", "ollama"}, {"ollama", "--help"}},
 	}
 	for want, argSets := range cases {

@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	DefaultBaseURL       = "http://127.0.0.1:11434"
+	DefaultBaseURL       = "http://localhost:11434"
 	DefaultContextLength = 65536
 
 	DropInDir        = "/etc/systemd/system/ollama.service.d"

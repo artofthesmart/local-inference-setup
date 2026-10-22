@@ -306,6 +306,118 @@ func TestLaunchWarnsAboutProvidersFile(t *testing.T) {
 	}
 }
 
+func TestConfigurePersistsSettingsAndDisablesAutoUpdate(t *testing.T) {
+	home, runner, _ := fakeWorld(t)
+	saveState(t, models.State{
+		LastUsed: "gpt-oss:20b",
+		Models:   []models.Qualified{{Tag: "llama3.1:8b", Context: 32768}, {Tag: "gpt-oss:20b", Context: 65536}},
+	})
+	code, out := runCLI(t, "configure")
+	if code != 0 || !strings.Contains(out, "configured to use gpt-oss:20b offline") {
+		t.Fatalf("%d\n%s", code, out)
+	}
+	lines := runner.Lines()
+	if !slices.Contains(lines, "/fake/copilot config autoUpdate false") {
+		t.Errorf("auto-update command wasn't run: %v", lines)
+	}
+	wantURL := "export COPILOT_PROVIDER_BASE_URL='" + os.Getenv("COPILOT_LOCAL_OLLAMA_URL") + "/v1'"
+	for _, name := range []string{".bashrc", ".zshrc"} {
+		content, err := os.ReadFile(filepath.Join(home, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, want := range []string{
+			"export COPILOT_OFFLINE='true'",
+			wantURL,
+			"export COPILOT_MODEL='gpt-oss:20b'",
+			"export COPILOT_PROVIDER_MAX_PROMPT_TOKENS='57344'",
+			"export COPILOT_PROVIDER_MAX_OUTPUT_TOKENS='8192'",
+		} {
+			if !strings.Contains(string(content), want) {
+				t.Errorf("%s missing %q:\n%s", name, want, content)
+			}
+		}
+	}
+}
+
+func TestConfigureWarnsAboutProvidersFile(t *testing.T) {
+	home, _, _ := fakeWorld(t)
+	t.Setenv("COPILOT_PROVIDERS_CONFIG", "")
+	t.Setenv("COPILOT_HOME", "")
+	os.MkdirAll(filepath.Join(home, ".copilot"), 0o755)
+	os.WriteFile(filepath.Join(home, ".copilot", "providers.json"), []byte("{}"), 0o644)
+	saveState(t, models.State{LastUsed: "tiny:1b", Models: []models.Qualified{{Tag: "tiny:1b", Context: 65536}}})
+	if code, out := runCLI(t, "configure"); code != 0 || !strings.Contains(out, "providers.json exists") {
+		t.Fatalf("%d\n%s", code, out)
+	}
+}
+
+func TestConfigureRequiresQualifiedModel(t *testing.T) {
+	_, runner, _ := fakeWorld(t)
+	if code, out := runCLI(t, "configure"); code != 1 || !strings.Contains(out, "Run `copilot-local model` first") {
+		t.Fatalf("%d\n%s", code, out)
+	}
+	if len(runner.Lines()) != 0 {
+		t.Errorf("commands ran without a qualified model: %v", runner.Lines())
+	}
+}
+
+func TestConfigureUsesSetxOnWindows(t *testing.T) {
+	_, runner, _ := fakeWorld(t)
+	baseNewEnv := newEnv
+	newEnv = func(out io.Writer) (*ollama.Env, error) {
+		e, err := baseNewEnv(out)
+		if err == nil {
+			e.Info.OS = "windows"
+		}
+		return e, err
+	}
+	saveState(t, models.State{LastUsed: "tiny:1b", Models: []models.Qualified{{Tag: "tiny:1b", Context: 65536}}})
+	code, out := runCLI(t, "configure")
+	if code != 0 || !strings.Contains(out, "Open a new terminal") {
+		t.Fatalf("%d\n%s", code, out)
+	}
+	lines := runner.Lines()
+	wantURL := "setx COPILOT_PROVIDER_BASE_URL " + os.Getenv("COPILOT_LOCAL_OLLAMA_URL") + "/v1"
+	for _, want := range []string{
+		"setx COPILOT_OFFLINE true",
+		wantURL,
+		"setx COPILOT_MODEL tiny:1b",
+		"setx COPILOT_PROVIDER_MAX_PROMPT_TOKENS 57344",
+		"setx COPILOT_PROVIDER_MAX_OUTPUT_TOKENS 8192",
+	} {
+		if !slices.Contains(lines, want) {
+			t.Errorf("missing %q from commands %v", want, lines)
+		}
+	}
+}
+
+func TestConfigureReportsAutoUpdateFailure(t *testing.T) {
+	_, runner, _ := fakeWorld(t)
+	saveState(t, models.State{LastUsed: "tiny:1b", Models: []models.Qualified{{Tag: "tiny:1b", Context: 65536}}})
+	runner.Failures = map[string]string{"/fake/copilot config autoUpdate false": "config command failed"}
+	if code, out := runCLI(t, "configure"); code != 1 || !strings.Contains(out, "Couldn't disable Copilot auto-update") {
+		t.Fatalf("%d\n%s", code, out)
+	}
+}
+
+func TestConfigureReportsSetxFailure(t *testing.T) {
+	_, runner, _ := fakeWorld(t)
+	baseNewEnv := newEnv
+	newEnv = func(out io.Writer) (*ollama.Env, error) {
+		e, err := baseNewEnv(out)
+		if err == nil {
+			e.Info.OS = "windows"
+		}
+		return e, err
+	}
+	saveState(t, models.State{LastUsed: "tiny:1b", Models: []models.Qualified{{Tag: "tiny:1b", Context: 65536}}})
+	runner.Failures = map[string]string{"setx COPILOT_OFFLINE": "access denied"}
+	if code, out := runCLI(t, "configure"); code != 1 || !strings.Contains(out, "Couldn't persist all Copilot settings") || !strings.Contains(out, "safe to re-run") {
+		t.Fatalf("%d\n%s", code, out)
+	}
+}
+
 func TestModelYesPicksDownloadsAndRecords(t *testing.T) {
 	fakeWorld(t)
 	o := &fakeOllama{ctx: 8192}

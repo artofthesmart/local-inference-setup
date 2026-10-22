@@ -35,6 +35,7 @@ Useful options, for example `curl -fsSL …/install.sh | sh -s -- model --ask-ge
 | `--model gpt-oss:20b` | Start Copilot with this model (it's downloaded and tested first if needed) |
 | `-- -p "fix the tests"` | Pass anything after `--` to Copilot |
 | `model` | Add, change, or re-test a model |
+| `configure` | Save your selected local model settings for future terminals |
 | `model --ask-gemini` | Make a prompt about your computer to ask Gemini which model to use, then paste back its answer |
 | `model --check` | Re-test the model you used last |
 | `ollama --dry-run` | Show what the Ollama setup would change, and change nothing |
