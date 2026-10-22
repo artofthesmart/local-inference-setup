@@ -38,6 +38,100 @@ func TestEnvironReplacesOldValues(t *testing.T) {
 	}
 }
 
+func TestUpdateShellProfiles(t *testing.T) {
+	home := t.TempDir()
+	settings := Settings{BaseURL: "http://localhost:11434", Model: "model'with-quote", Context: 65536}
+	if err := UpdateShellProfiles(home, settings); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{".bashrc", ".zshrc"} {
+		content, err := os.ReadFile(filepath.Join(home, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		text := string(content)
+		for _, want := range []string{
+			profileStart,
+			"export COPILOT_OFFLINE='true'",
+			"export COPILOT_PROVIDER_BASE_URL='http://localhost:11434/v1'",
+			`export COPILOT_MODEL='model'"'"'with-quote'`,
+			"export COPILOT_PROVIDER_MAX_PROMPT_TOKENS='57344'",
+			"export COPILOT_PROVIDER_MAX_OUTPUT_TOKENS='8192'",
+			profileEnd,
+		} {
+			if !strings.Contains(text, want) {
+				t.Errorf("%s missing %q in:\n%s", name, want, text)
+			}
+		}
+	}
+}
+
+func TestUpdateShellProfilesReplacesOnlyManagedBlock(t *testing.T) {
+	home := t.TempDir()
+	path := filepath.Join(home, ".bashrc")
+	initial := "export KEEP_ME=1\n" + profileStart + "\nexport COPILOT_MODEL='old'\n" + profileEnd + "\nsource ~/.custom\n"
+	if err := os.WriteFile(path, []byte(initial), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	settings := Settings{BaseURL: "http://localhost:11434", Model: "new", Context: 32768}
+	if err := updateShellProfile(path, settings); err != nil {
+		t.Fatal(err)
+	}
+	first, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := updateShellProfile(path, settings); err != nil {
+		t.Fatal(err)
+	}
+	second, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(second)
+	if string(first) != text {
+		t.Errorf("re-running changed the profile:\n%s", text)
+	}
+	if strings.Count(text, profileStart) != 1 || strings.Count(text, profileEnd) != 1 || !strings.Contains(text, "export KEEP_ME=1") || !strings.Contains(text, "source ~/.custom") || strings.Contains(text, "COPILOT_MODEL='old'") {
+		t.Errorf("managed block was not safely replaced:\n%s", text)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
+		t.Errorf("profile permissions changed: %o", info.Mode().Perm())
+	}
+}
+
+func TestUpdateShellProfilesPreservesCRLF(t *testing.T) {
+	home := t.TempDir()
+	path := filepath.Join(home, ".bashrc")
+	if err := os.WriteFile(path, []byte("export KEEP_ME=1\r\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := updateShellProfile(path, Settings{BaseURL: "u", Model: "m", Context: 65536}); err != nil {
+		t.Fatal(err)
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(content), "export KEEP_ME=1\r\n"+profileStart+"\r\n") {
+		t.Errorf("CRLF profile was not preserved: %q", content)
+	}
+}
+
+func TestUpdateShellProfilesRejectsIncompleteBlock(t *testing.T) {
+	path := filepath.Join(t.TempDir(), ".bashrc")
+	if err := os.WriteFile(path, []byte(profileStart+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := updateShellProfile(path, Settings{BaseURL: "u", Model: "m", Context: 65536}); err == nil {
+		t.Fatal("expected an incomplete block error")
+	}
+}
+
 func TestFind(t *testing.T) {
 	if _, err := Find(func(string) (string, error) { return "", exec.ErrNotFound }); !errors.Is(err, ErrNotInstalled) || !strings.Contains(err.Error(), "npm install -g @github/copilot") {
 		t.Errorf("%v", err)

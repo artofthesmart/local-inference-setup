@@ -81,6 +81,14 @@ Keep the sum of the two values at or below `OLLAMA_CONTEXT_LENGTH`.
 
 ## Step 4: Make it permanent
 
+**Automated setup:** after you've set up a model with `copilot-local`, save its settings for future terminals:
+
+```shell
+copilot-local configure
+```
+
+The command uses your last selected, qualified model and its saved context size. On macOS and Linux, it writes a replaceable settings block to both `~/.bashrc` and `~/.zshrc`; on Windows, it saves the settings with `setx`. It also runs `copilot config autoUpdate false` and warns if `~/.copilot/providers.json` may override the local settings. If you haven't selected a model yet, run `copilot-local model` first. Open a new terminal after setup. It is safe to run the command again after changing models.
+
 **macOS and Linux:** add the settings to `~/.bashrc` or `~/.zshrc` in one command, then open a new terminal:
 
 ```shell
