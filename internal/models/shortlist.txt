@@ -1,0 +1,14 @@
+# Models copilot-local offers and auto-picks from.
+#
+# Edit this list to change the choices. Each line is an exact Ollama model tag, then a short description.
+# Every entry is checked against Ollama's registry before it's offered: it must exist and support at least 64k tokens of context.
+# To use your own list without rebuilding, copy this file to the copilot-local settings folder (shown by `copilot-local model --help`).
+#
+# Started from the list tested in artofthesmart/dotfiles-bootstrap, plus qwen3.6 from this repo's README.
+
+llama3.1:8b        Small and widely supported; fits most laptops
+mistral-nemo:12b   Small, with a very long context window
+gpt-oss:20b        OpenAI's open model; strong at tool use
+devstral:24b       Mistral's coding-agent model
+qwen3-coder:30b    Strong coding model; needs a big GPU or Mac
+qwen3.6:latest     Strong all-rounder; needs a big GPU or Mac

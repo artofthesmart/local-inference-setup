@@ -34,6 +34,19 @@
 - `GET /api/status` reports whether Ollama cloud is off. That's how the tool checks it.
 - Work-managed Windows PCs: Defender's ASR rule "Use advanced protection against ransomware" (`C1DB55AB-C21A-4637-BB3F-A12568109D35`) blocks the unsigned `copilot-local.exe` after it's downloaded. Code-signing the Windows build fixes this.
 
+## Decisions from issue #3 (model choice and launcher)
+
+- **`copilot-local` is a launcher.** With no arguments, it starts Copilot CLI on a local model, setting everything up the first time. Settings are passed only to that Copilot run, so no shell profiles or `setx` are changed (the permanent setup in #4 is now optional). Plan: [plans/issue-3-model-selection.md](plans/issue-3-model-selection.md).
+- **A default that just works.** A short [editable list](internal/models/shortlist.txt) is checked against Ollama's registry (download size, plus real context length read from the model file's header). The biggest model whose estimated memory need fits is picked automatically. Memory pools are never added together: GPU memory, about 2/3 to 3/4 of Apple unified memory, half of RAM for Windows built-in GPUs, or RAM minus headroom for CPU only.
+- **Only tested models are offered.** A model must be local, claim tool support, accept the context size, make a real streamed tool call through `/v1/chat/completions`, and load with the full context (`/api/ps`). Results are saved in `models.json` in the settings folder; VS Code and Desktop setup can read it later.
+- **Gemini is optional.** `model --ask-gemini` builds a prompt from the hardware facts and the checked list, and accepts only a model from that list. The prompt and fit rules come from the tested `dotfiles-bootstrap` setup.
+- **Downloads are on demand in CI.** The e2e workflow downloads a small model only when started by hand.
+
+## Findings from building the launcher (issue #3)
+
+- On WSL using Ollama on Windows, the hardware that matters is the Windows host's, so the tool reads it through `powershell.exe` and `nvidia-smi.exe`.
+- Ollama on Windows may load models with a smaller context than asked for. The `/api/ps` check catches this; `--context` can accept the smaller size.
+
 ## Open questions and unverified items
 
 - VS Code: whether a signed-in Copilot extension still sends any request content to GitHub when only BYOK models are used. The guide recommends staying signed out to be sure.
@@ -44,7 +57,7 @@
 
 ## Candidate automation (next phase)
 
-- A cross-platform script that checks for and installs Ollama, sets `OLLAMA_CONTEXT_LENGTH` and `OLLAMA_NO_CLOUD`, pulls a tool-capable model, and checks `ollama show` for tool support.
+- ~~A cross-platform script that checks for and installs Ollama, sets `OLLAMA_CONTEXT_LENGTH` and `OLLAMA_NO_CLOUD`, pulls a tool-capable model, and checks `ollama show` for tool support.~~ Done in #2 and #3.
 - VS Code: install `Ollama.ollama` and merge the privacy and BYOK keys into the user `settings.json`.
 - Copilot CLI: write the environment block to the shell profile or PowerShell profile, run `copilot config autoUpdate false`, and optionally add a `copilot-local` alias.
 - GitHub Desktop: no reliable automation, because settings live in app-internal storage. Provide a checklist, plus optional hosts-file blocking for the telemetry hosts.

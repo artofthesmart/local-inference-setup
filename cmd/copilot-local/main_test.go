@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -45,13 +46,35 @@ func TestVersion(t *testing.T) {
 }
 
 func TestHelp(t *testing.T) {
-	for _, arg := range []string{"help", "--help"} {
-		if code, out := runCLI(t, arg); code != 0 || !strings.Contains(out, "--dry-run") {
-			t.Fatalf("%s: %d %q", arg, code, out)
+	cases := map[string][][]string{
+		"Start Copilot with a specific model": {{"help"}, {"--help"}, {"-h"}, {"--help", "extra"}},
+		"copilot-local model adds":            {{"help", "model"}, {"model", "--help"}, {"model", "-h"}},
+		"copilot-local ollama installs":       {{"help", "ollama"}, {"ollama", "--help"}},
+	}
+	for want, argSets := range cases {
+		for _, args := range argSets {
+			if code, out := runCLI(t, args...); code != 0 || !strings.Contains(out, want) || !strings.Contains(out, "Usage:") {
+				t.Errorf("%q: %d %q", args, code, out)
+			}
 		}
 	}
-	if code, out := runCLI(t, "ollama", "-h"); code != 0 || !strings.Contains(out, "Usage:") {
-		t.Fatalf("ollama -h: %d %q", code, out)
+	if code, out := runCLI(t, "help", "bogus"); code != 2 || !strings.Contains(out, `No help for "bogus"`) {
+		t.Errorf("help bogus: %d %q", code, out)
+	}
+}
+
+func TestHelpListsEveryFlag(t *testing.T) {
+	fs, _ := newLaunchFlags(io.Discard)
+	if missing := undocumentedFlags(fs, topUsage); len(missing) > 0 {
+		t.Errorf("copilot-local help is missing %v", missing)
+	}
+	fs, _ = newModelFlags(io.Discard)
+	if missing := undocumentedFlags(fs, helpFor("model", "x")); len(missing) > 0 {
+		t.Errorf("model help is missing %v", missing)
+	}
+	fs, _ = newOllamaFlags(io.Discard)
+	if missing := undocumentedFlags(fs, helpFor("ollama", "")); len(missing) > 0 {
+		t.Errorf("ollama help is missing %v", missing)
 	}
 }
 
@@ -67,12 +90,6 @@ func TestBadFlags(t *testing.T) {
 	}
 	if code, _ := runCLI(t, "ollama", "--nope"); code != 2 {
 		t.Errorf("unknown flag: %d", code)
-	}
-}
-
-func TestNoArgsWithoutTerminalShowsUsage(t *testing.T) {
-	if code, out := runCLI(t); code != 2 || !strings.Contains(out, "Usage:") {
-		t.Fatalf("%d %q", code, out)
 	}
 }
 
