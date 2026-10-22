@@ -29,6 +29,7 @@ Commands:
   model     Add, change, or re-test a model (can ask Gemini to help you choose)
   configure Save the local model settings for future terminals
   vscode    Install the Ollama VS Code extension and configure local generation/privacy
+  verify    Check the whole setup, including a real offline Copilot test prompt
   ollama    Install Ollama and tune it for Copilot (part of first-time setup)
   version   Print the version
   help      Show help for a command, for example: copilot-local help model
@@ -113,6 +114,28 @@ and JSONC comments, and asks before replacing conflicting values. GitHub.com acc
 privacy controls are separate.
 `
 
+const verifyUsage = `copilot-local verify checks the local setup and prints PASS/FAIL results with fixes.
+
+Usage:
+  copilot-local verify [flags]
+
+Flags:
+  --model TAG     Check this model (default: the last selected, qualified model)
+  --context N     Expected context size (default: saved model context, or 65536)
+  --profile NAME  VS Code profile to check (required when multiple profiles exist)
+  --skip-vscode   Check CLI-only setup without requiring VS Code
+  --timeout D     Maximum time for model and Copilot tests (default 3m)
+
+It checks Ollama, cloud opt-out, a real tool call, loaded context, CLI environment,
+and VS Code's extension and privacy settings. It runs a fixed Copilot test prompt
+offline in a temporary workspace with isolated settings and no tools, then deletes
+the temporary files. No installation, download, or settings changes are made.
+Models may be loaded into memory. Unset CLI variables are warnings, since the
+launcher supplies them; conflicting variables and provider files are failures.
+Desktop configuration and VS Code's selected chat model still need manual checks.
+Exit codes: 0 = no failures (warnings/manual checks may remain), 1 = failed, 2 = bad arguments.
+`
+
 // helpFor returns the help text for a command, or "" if there's no such command.
 func helpFor(cmd, shortlistPath string) string {
 	switch cmd {
@@ -124,6 +147,8 @@ func helpFor(cmd, shortlistPath string) string {
 		return configureUsage + "\nGuides: " + guideURL + "\n"
 	case "vscode":
 		return vscodeUsage + "\nGuides: " + guideURL + "\n"
+	case "verify":
+		return verifyUsage + "\nGuides: " + guideURL + "\n"
 	case "ollama":
 		return ollamaUsage + "\nGuides: " + guideURL + "\n"
 	case "version":

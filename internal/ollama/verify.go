@@ -99,7 +99,7 @@ func Verify(ctx context.Context, e *Env, want int) Report {
 	case s.CloudKnown && s.CloudDisabled:
 		r.add("Ollama cloud off", Pass, "The server reports cloud is disabled", "")
 	case s.CloudKnown:
-		r.add("Ollama cloud off", Fail, "The server reports cloud is still on", restartFix(e, s))
+		r.add("Ollama cloud off", Fail, "The server reports cloud is still on", "Run `copilot-local ollama` on the machine hosting Ollama to disable cloud. "+restartFix(e, s))
 	case s.ConfiguredNoCloud:
 		r.add("Ollama cloud off", Warn, "Turned off in settings, but this Ollama version can't confirm it", "Update Ollama to confirm.")
 	default:
@@ -181,6 +181,8 @@ func startFix(e *Env, s *State) string {
 
 func restartFix(e *Env, s *State) string {
 	switch {
+	case s.WindowsSideServer:
+		return "On Windows, quit Ollama from the system tray, then start it again from the Start menu."
 	case e.usesSystemd(s):
 		return "Run `sudo systemctl restart ollama`."
 	case e.Info.OS == "darwin" && s.MacApp:

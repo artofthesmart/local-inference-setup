@@ -35,6 +35,12 @@ jobs:
       - name: Download and test a small model
         shell: bash
         run: ./copilot-local model --model qwen3:1.7b --context 32768 --yes
+      - name: Verify through real Copilot CLI (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          npm install --prefix "$RUNNER_TEMP/copilot-cli" @github/copilot
+          PATH="$RUNNER_TEMP/copilot-cli/node_modules/.bin:$PATH" ./copilot-local verify --skip-vscode --context 32768 --timeout 5m
       - name: Launch passes the local settings to Copilot
         shell: bash
         run: |
