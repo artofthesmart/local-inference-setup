@@ -38,6 +38,7 @@ Useful options, for example `curl -fsSL …/install.sh | sh -s -- model --ask-ge
 | `configure` | Save your selected local model settings for future terminals |
 | `model --ask-gemini` | Make a prompt about your computer to ask Gemini which model to use, then paste back its answer |
 | `model --check` | Re-test the model you used last |
+| `vscode` | Install the Ollama VS Code extension and configure local generation and privacy settings |
 | `ollama --dry-run` | Show what the Ollama setup would change, and change nothing |
 | `ollama --context 131072` | Use a different context length (default 65536) |
 | `ollama --undo` | Remove the Ollama settings the tool added (Ollama stays installed) |

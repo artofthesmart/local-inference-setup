@@ -2,6 +2,12 @@
 
 This guide sets up GitHub Copilot Chat in VS Code to use models served by Ollama on your machine, and turns off as much telemetry as VS Code allows.
 
+## Automated setup
+
+Run `copilot-local vscode` to install the official `Ollama.ollama` extension and apply the local-generation and privacy settings described in this guide. It requires VS Code 1.127 or newer. Use `--dry-run` to preview changes or `--yes` to apply them without confirmation.
+
+If VS Code has multiple profiles, select the one you want to configure or pass its name with `--profile "Profile Name"`. The command cannot tell which profile is active in an already-open VS Code window. Profile-specific settings and the extension are applied to the selected profile; application-wide telemetry, update, and sync settings are written to the Default Profile. Each settings file is backed up before it changes, unrelated settings are preserved, and conflicts are confirmed before replacement. GitHub.com account-level privacy controls remain a separate manual step.
+
 ## What runs where
 
 | Feature | Local with this setup? | Notes |

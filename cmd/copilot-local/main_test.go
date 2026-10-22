@@ -50,6 +50,7 @@ func TestHelp(t *testing.T) {
 		"Start Copilot with a specific model": {{"help"}, {"--help"}, {"-h"}, {"--help", "extra"}},
 		"copilot-local model adds":            {{"help", "model"}, {"model", "--help"}, {"model", "-h"}},
 		"copilot-local configure saves":       {{"help", "configure"}, {"configure", "--help"}},
+		"copilot-local vscode installs":       {{"help", "vscode"}, {"vscode", "--help"}},
 		"copilot-local ollama installs":       {{"help", "ollama"}, {"ollama", "--help"}},
 	}
 	for want, argSets := range cases {
@@ -76,6 +77,15 @@ func TestHelpListsEveryFlag(t *testing.T) {
 	fs, _ = newOllamaFlags(io.Discard)
 	if missing := undocumentedFlags(fs, helpFor("ollama", "")); len(missing) > 0 {
 		t.Errorf("ollama help is missing %v", missing)
+	}
+	if code, out := runCLI(t, "vscode", "--help"); code != 0 {
+		t.Errorf("vscode help: %d %q", code, out)
+	} else {
+		for _, flag := range []string{"--profile", "--yes", "--dry-run"} {
+			if !strings.Contains(out, flag) {
+				t.Errorf("vscode help is missing %s", flag)
+			}
+		}
 	}
 }
 

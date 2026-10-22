@@ -28,6 +28,7 @@ Flags:
 Commands:
   model     Add, change, or re-test a model (can ask Gemini to help you choose)
   configure Save the local model settings for future terminals
+  vscode    Install the Ollama VS Code extension and configure local generation/privacy
   ollama    Install Ollama and tune it for Copilot (part of first-time setup)
   version   Print the version
   help      Show help for a command, for example: copilot-local help model
@@ -35,6 +36,7 @@ Commands:
 Examples:
   copilot-local                          Set up (first time), then start Copilot
   copilot-local --model llama3.1:8b      Start Copilot with a specific model
+  copilot-local vscode                   Set up VS Code to use local Ollama models
   copilot-local -- -p "fix the tests"    Pass arguments to Copilot after --
   copilot-local model --ask-gemini       Get Gemini's advice on which model to use
 
@@ -92,6 +94,25 @@ It writes the offline provider settings to both ~/.bashrc and ~/.zshrc on macOS/
 or saves them with setx on Windows. It also disables Copilot CLI auto-update. Safe to re-run.
 `
 
+const vscodeUsage = `copilot-local vscode installs the Ollama VS Code extension and configures
+the selected VS Code profile for local Copilot generation and the privacy settings in the guide.
+
+Usage:
+  copilot-local vscode [--profile NAME] [--yes] [--dry-run]
+
+Flags:
+  --profile NAME  Configure this VS Code profile; if omitted, choose interactively when needed
+  --yes           Don't ask before installing or replacing settings
+  --dry-run       Show planned settings changes without applying them
+
+The command requires VS Code 1.127 or newer. With multiple profiles, choose one or pass
+--profile; --yes requires an explicit profile when the choice is ambiguous. Profile-specific
+settings go in that profile, while application-wide telemetry and update settings go in
+Default Profile settings. It backs up each file before editing, preserves unrelated settings
+and JSONC comments, and asks before replacing conflicting values. GitHub.com account-level
+privacy controls are separate.
+`
+
 // helpFor returns the help text for a command, or "" if there's no such command.
 func helpFor(cmd, shortlistPath string) string {
 	switch cmd {
@@ -101,6 +122,8 @@ func helpFor(cmd, shortlistPath string) string {
 		return fmt.Sprintf(modelUsage, shortlistPath)
 	case "configure":
 		return configureUsage + "\nGuides: " + guideURL + "\n"
+	case "vscode":
+		return vscodeUsage + "\nGuides: " + guideURL + "\n"
 	case "ollama":
 		return ollamaUsage + "\nGuides: " + guideURL + "\n"
 	case "version":
