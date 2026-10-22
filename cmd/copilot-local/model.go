@@ -200,8 +200,11 @@ func (a *app) chooseModel(ctx context.Context, f modelFlags, installed []string)
 
 const geminiChoice = "\x00gemini"
 
-func (a *app) selectModel(ctx context.Context, list []models.Info, pick models.Info, fits bool, b hardware.Budget, want uint64, installed []string) (string, error) {
-	ordered := slices.Clone(list)
+// menuModels orders the menu: the pick first, then biggest to smallest. Menu-only models that don't fit are left out unless already downloaded.
+func menuModels(list []models.Info, pick models.Info, b hardware.Budget, want uint64, installed []string) []models.Info {
+	ordered := slices.DeleteFunc(slices.Clone(list), func(m models.Info) bool {
+		return m.MenuOnly && !m.Fits(b.Bytes, want) && m.Tag != pick.Tag && !slices.Contains(installed, m.Tag)
+	})
 	slices.SortStableFunc(ordered, func(x, y models.Info) int {
 		switch {
 		case x.Tag == pick.Tag:
@@ -211,9 +214,13 @@ func (a *app) selectModel(ctx context.Context, list []models.Info, pick models.I
 		}
 		return int(int64(y.Size)/1e6 - int64(x.Size)/1e6)
 	})
+	return ordered
+}
+
+func (a *app) selectModel(ctx context.Context, list []models.Info, pick models.Info, fits bool, b hardware.Budget, want uint64, installed []string) (string, error) {
 	var opts []huh.Option[string]
-	for _, m := range ordered {
-		label := fmt.Sprintf("%-18s %s", m.Tag, hardware.Size(m.Size))
+	for _, m := range menuModels(list, pick, b, want, installed) {
+		label := fmt.Sprintf("%-24s %s", m.Tag, hardware.Size(m.Size))
 		var tags []string
 		if m.Tag == pick.Tag && fits {
 			tags = append(tags, "recommended")

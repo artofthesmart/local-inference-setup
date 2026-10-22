@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -24,7 +25,12 @@ var builtinShortlist string
 type Candidate struct {
 	Tag  string
 	Note string
+	// MenuOnly models are offered in the menu but never picked automatically.
+	MenuOnly bool
 }
+
+// menuOnlyHeading starts the shortlist section of models that are never picked automatically.
+const menuOnlyHeading = "[menu-only]"
 
 // LoadShortlist reads the user's copy of the shortlist if there is one, otherwise the built-in list.
 func LoadShortlist(overridePath string) ([]Candidate, string, error) {
@@ -40,13 +46,18 @@ func LoadShortlist(overridePath string) ([]Candidate, string, error) {
 	return list, source, err
 }
 
-// ParseShortlist reads "tag  description" lines, skipping blanks and # comments.
+// ParseShortlist reads "tag  description" lines, skipping blanks and # comments. Lines after a "[menu-only]" line are never picked automatically.
 func ParseShortlist(text string) ([]Candidate, error) {
 	var out []Candidate
 	seen := map[string]bool{}
+	menuOnly := false
 	for i, line := range strings.Split(text, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if strings.EqualFold(line, menuOnlyHeading) {
+			menuOnly = true
 			continue
 		}
 		f := strings.Fields(line)
@@ -58,7 +69,7 @@ func ParseShortlist(text string) ([]Candidate, error) {
 			continue
 		}
 		seen[tag] = true
-		out = append(out, Candidate{Tag: tag, Note: strings.Join(f[1:], " ")})
+		out = append(out, Candidate{Tag: tag, Note: strings.Join(f[1:], " "), MenuOnly: menuOnly})
 	}
 	if len(out) == 0 {
 		return nil, errors.New("the shortlist is empty")
@@ -75,6 +86,9 @@ type Info struct {
 	// KVPerToken is the estimated context-cache memory per token; 0 if unknown.
 	KVPerToken uint64
 	Arch       string
+	// Rank is the model's place in the shortlist; later lines are preferred when picking automatically.
+	Rank     int
+	MenuOnly bool
 }
 
 // Registry reads model facts from Ollama's registry without downloading the model.
@@ -176,7 +190,7 @@ func (r Registry) CheckShortlist(ctx context.Context, list []Candidate, wantCont
 		go func() {
 			defer wg.Done()
 			info, err := r.Inspect(ctx, c.Tag)
-			info.Note = c.Note
+			info.Note, info.Rank, info.MenuOnly = c.Note, i, c.MenuOnly
 			results[i] = result{i, info, err}
 		}()
 	}
@@ -217,17 +231,21 @@ func (i Info) Fits(budget, contextLen uint64) bool {
 	return budget > 0 && i.MemoryNeed(contextLen) <= budget
 }
 
-// Pick returns the biggest model that fits, or the smallest one with fits=false when none do.
+// Pick returns the preferred model that fits: the latest in the shortlist, then the biggest. Menu-only models are skipped. When none fit, it returns the smallest with fits=false.
 func Pick(list []Info, budget, contextLen uint64) (best Info, fits bool) {
-	if len(list) == 0 {
+	auto := slices.DeleteFunc(slices.Clone(list), func(m Info) bool { return m.MenuOnly })
+	if len(auto) == 0 {
+		auto = list
+	}
+	if len(auto) == 0 {
 		return Info{}, false
 	}
-	smallest := list[0]
-	for _, m := range list {
+	smallest := auto[0]
+	for _, m := range auto {
 		if m.MemoryNeed(contextLen) < smallest.MemoryNeed(contextLen) {
 			smallest = m
 		}
-		if m.Fits(budget, contextLen) && (!fits || m.Size > best.Size) {
+		if m.Fits(budget, contextLen) && (!fits || m.Rank > best.Rank || (m.Rank == best.Rank && m.Size > best.Size)) {
 			best, fits = m, true
 		}
 	}

@@ -90,6 +90,64 @@ func TestParseGGUF(t *testing.T) {
 	}
 }
 
+func TestKVHybridAndMLA(t *testing.T) {
+	parse := func(g *ggufBuilder) Header {
+		t.Helper()
+		h, err := ParseGGUF(g.bytes())
+		if err != nil {
+			t.Fatal(err)
+		}
+		return h
+	}
+	base := func(arch string, layers uint32) *ggufBuilder {
+		g := &ggufBuilder{}
+		g.kv("general.architecture", ggufString, arch)
+		g.kv(arch+".block_count", ggufU32, layers)
+		g.kv(arch+".attention.head_count", ggufU32, uint32(32))
+		g.kv(arch+".attention.key_length", ggufU32, uint32(128))
+		g.kv(arch+".attention.value_length", ggufU32, uint32(128))
+		return g
+	}
+	per := uint64(8 * 256 * 2) // one layer: 8 KV heads x (128 + 128) x 2 bytes
+
+	// Per-layer list with 0 for state-space layers: only 2 of 6 layers keep a cache.
+	g := base("nemotron_h", 6)
+	g.kv("nemotron_h.attention.head_count_kv", ggufArray, []uint32{0, 0, 8, 0, 0, 8})
+	if got := parse(g).kvBytesPerToken(); got != 2*per {
+		t.Errorf("per-layer list: %d", got)
+	}
+
+	// Full attention every 4th layer: 48 layers -> 12.
+	g = base("qwen35", 48)
+	g.kv("qwen35.attention.head_count_kv", ggufU32, uint32(8))
+	g.kv("qwen35.full_attention_interval", ggufU32, uint32(4))
+	if got := parse(g).kvBytesPerToken(); got != 12*per {
+		t.Errorf("interval: %d", got)
+	}
+
+	// State-space model with no layout: assume one cache layer in four (rounded up).
+	g = base("qwen3next", 50)
+	g.kv("qwen3next.attention.head_count_kv", ggufU32, uint32(8))
+	g.kv("qwen3next.ssm.inner_size", ggufU32, uint32(4096))
+	if got := parse(g).kvBytesPerToken(); got != 13*per {
+		t.Errorf("ssm: %d", got)
+	}
+
+	// Compressed (MLA) cache: one 512+64 key and 512 value vector per layer.
+	g = base("deepseek2", 10)
+	g.kv("deepseek2.attention.kv_lora_rank", ggufU32, uint32(512))
+	g.kv("deepseek2.attention.key_length_mla", ggufU32, uint32(576))
+	g.kv("deepseek2.attention.value_length_mla", ggufU32, uint32(512))
+	if got := parse(g).kvBytesPerToken(); got != 10*(576+512)*2 {
+		t.Errorf("mla: %d", got)
+	}
+	g = base("deepseek2", 10)
+	g.kv("deepseek2.attention.kv_lora_rank", ggufU32, uint32(512))
+	if got := parse(g).kvBytesPerToken(); got != 10*576*2 {
+		t.Errorf("mla without lengths: %d", got)
+	}
+}
+
 func TestParseGGUF32BitContext(t *testing.T) {
 	var g ggufBuilder
 	g.kv("general.architecture", ggufString, "qwen3")
@@ -162,9 +220,22 @@ func TestParseShortlist(t *testing.T) {
 	if _, err := ParseShortlist("foo-cloud\n"); err == nil {
 		t.Error("cloud model in list")
 	}
+	list, err = ParseShortlist("a:1 A\n[Menu-Only]\n# big ones\nb:2 B\n")
+	if err != nil || len(list) != 2 || list[0].MenuOnly || !list[1].MenuOnly || list[1].Note != "B" {
+		t.Fatalf("menu-only: %v %+v", err, list)
+	}
 	builtin, src, err := LoadShortlist("/does/not/exist")
-	if err != nil || src != "built-in list" || len(builtin) != 6 {
+	if err != nil || src != "built-in list" || len(builtin) < 10 {
 		t.Fatalf("%v %s %d", err, src, len(builtin))
+	}
+	auto := 0
+	for _, c := range builtin {
+		if !c.MenuOnly {
+			auto++
+		}
+	}
+	if auto < 5 || auto == len(builtin) {
+		t.Errorf("built-in list should have auto-pick and menu-only models: %d of %d", auto, len(builtin))
 	}
 }
 
@@ -206,9 +277,9 @@ func TestCheckShortlist(t *testing.T) {
 	}, map[string]uint64{"big:latest": 20 * gib, "small:1b": 2 * gib, "shortctx:7b": gib, "notgguf:7b": gib})
 	defer srv.Close()
 	r := Registry{BaseURL: srv.URL, HTTP: srv.Client()}
-	list := []Candidate{{Tag: "big:latest", Note: "B"}, {Tag: "small:1b"}, {Tag: "shortctx:7b"}, {Tag: "notgguf:7b"}, {Tag: "missing:1b"}}
+	list := []Candidate{{Tag: "big:latest", Note: "B", MenuOnly: true}, {Tag: "small:1b"}, {Tag: "shortctx:7b"}, {Tag: "notgguf:7b"}, {Tag: "missing:1b"}}
 	got := r.CheckShortlist(t.Context(), list, 65536)
-	if len(got.OK) != 2 || got.OK[0].Tag != "small:1b" || got.OK[1].Note != "B" || got.OK[1].Size != 20*gib+100 {
+	if len(got.OK) != 2 || got.OK[0].Tag != "small:1b" || got.OK[1].Note != "B" || got.OK[1].Size != 20*gib+100 || !got.OK[1].MenuOnly || got.OK[1].Rank != 0 || got.OK[0].Rank != 1 {
 		t.Fatalf("%+v", got.OK)
 	}
 	joined := strings.Join(got.Skipped, "\n")
@@ -242,6 +313,18 @@ func TestPick(t *testing.T) {
 		if got.Tag != c.want || fits != c.fits {
 			t.Errorf("%s: got %s fits=%v", c.name, got.Tag, fits)
 		}
+	}
+	// List order beats size, and menu-only models are never auto-picked.
+	ranked := []Info{
+		{Tag: "huge-dense", Size: 30 * gib, KVPerToken: kv / 4, Rank: 3, MenuOnly: true},
+		{Tag: "bigger-older", Size: 20 * gib, KVPerToken: kv / 4, Rank: 0},
+		{Tag: "smaller-better", Size: 18 * gib, KVPerToken: kv / 4, Rank: 1},
+	}
+	if got, fits := Pick(ranked, 100*gib, 65536); got.Tag != "smaller-better" || !fits {
+		t.Errorf("rank: got %s", got.Tag)
+	}
+	if got, fits := Pick(ranked[:1], 100*gib, 65536); got.Tag != "huge-dense" || !fits {
+		t.Errorf("only menu-only models: got %s", got.Tag)
 	}
 	if _, fits := Pick(nil, gib, 1); fits {
 		t.Error("empty list")

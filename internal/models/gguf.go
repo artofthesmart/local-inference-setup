@@ -30,6 +30,8 @@ type Header struct {
 	Arch string
 	// Numbers holds every whole-number setting that was read. Per-layer arrays keep their largest value.
 	Numbers map[string]uint64
+	// NonZero counts the non-zero items of number arrays that contain a 0. Hybrid models list 0 key-value heads for layers without a context cache.
+	NonZero map[string]uint64
 	// Truncated is true when the bytes ran out before every setting was read. Model files list tokenizer data last, so the important settings usually come first.
 	Truncated bool
 }
@@ -80,7 +82,7 @@ func (r *reader) str() (string, error) {
 
 // ParseGGUF reads the settings at the start of a GGUF file. It reads key by key rather than searching for bytes, so a number that happens to look like a key can't fool it.
 func ParseGGUF(b []byte) (Header, error) {
-	h := Header{Numbers: map[string]uint64{}}
+	h := Header{Numbers: map[string]uint64{}, NonZero: map[string]uint64{}}
 	r := &reader{b: b}
 	magic, err := r.take(4)
 	if err != nil || !bytes.Equal(magic, []byte("GGUF")) {
@@ -118,7 +120,7 @@ func ParseGGUF(b []byte) (Header, error) {
 			}
 			continue
 		}
-		n, isNum, err := r.value(typ)
+		v, err := r.value(typ)
 		if err != nil {
 			if errors.Is(err, errShort) {
 				h.Truncated = true
@@ -126,8 +128,11 @@ func ParseGGUF(b []byte) (Header, error) {
 			}
 			return h, err
 		}
-		if isNum {
-			h.Numbers[key] = n
+		if v.isNum {
+			h.Numbers[key] = v.n
+			if v.isArray && v.nonZero < v.items {
+				h.NonZero[key] = v.nonZero
+			}
 		}
 	}
 	if h.Arch == "" {
@@ -136,33 +141,47 @@ func ParseGGUF(b []byte) (Header, error) {
 	return h, nil
 }
 
+type value struct {
+	n       uint64
+	isNum   bool
+	isArray bool
+	items   uint64 // arrays only: how many number items
+	nonZero uint64 // arrays only: how many items aren't 0
+}
+
 // value reads one value. Whole numbers (and arrays of them, by their largest item) are returned; everything else is skipped.
-func (r *reader) value(typ uint32) (uint64, bool, error) {
+func (r *reader) value(typ uint32) (value, error) {
 	if typ == ggufArray {
 		itemType, err := r.u32()
 		if err != nil {
-			return 0, false, err
+			return value{}, err
 		}
 		n, err := r.u64()
 		if err != nil {
-			return 0, false, err
+			return value{}, err
 		}
-		var max uint64
-		isNum := false
+		out := value{isArray: true}
 		for j := uint64(0); j < n; j++ {
-			v, num, err := r.value(itemType)
+			v, err := r.value(itemType)
 			if err != nil {
-				return 0, false, err
+				return value{}, err
 			}
-			if num {
-				isNum = true
-				if v > max {
-					max = v
+			if v.isNum {
+				out.isNum = true
+				out.n = max(out.n, v.n)
+				out.items++
+				if v.n > 0 {
+					out.nonZero++
 				}
 			}
 		}
-		return max, isNum, nil
+		return out, nil
 	}
+	n, isNum, err := r.scalar(typ)
+	return value{n: n, isNum: isNum}, err
+}
+
+func (r *reader) scalar(typ uint32) (uint64, bool, error) {
 	size := map[uint32]uint64{ggufU8: 1, ggufI8: 1, ggufBool: 1, ggufU16: 2, ggufI16: 2, ggufU32: 4, ggufI32: 4, ggufF32: 4, ggufU64: 8, ggufI64: 8, ggufF64: 8}
 	if typ == ggufString {
 		_, err := r.str()
@@ -208,6 +227,17 @@ func nonNeg(v int64) uint64 {
 func (h Header) kvBytesPerToken() uint64 {
 	a := h.Arch + "."
 	layers := h.Numbers[a+"block_count"]
+	if layers == 0 {
+		return 0
+	}
+	// Compressed (MLA) caches store one small shared vector per layer instead of one per head.
+	if rank := h.Numbers[a+"attention.kv_lora_rank"]; rank > 0 {
+		k, v := h.Numbers[a+"attention.key_length_mla"], h.Numbers[a+"attention.value_length_mla"]
+		if k == 0 {
+			k = rank + 64
+		}
+		return layers * (k + v) * 2
+	}
 	kvHeads := h.Numbers[a+"attention.head_count_kv"]
 	if kvHeads == 0 {
 		kvHeads = h.Numbers[a+"attention.head_count"]
@@ -221,10 +251,26 @@ func (h Header) kvBytesPerToken() uint64 {
 	if valLen == 0 {
 		valLen = keyLen
 	}
-	if layers == 0 || kvHeads == 0 || keyLen == 0 {
+	if kvHeads == 0 || keyLen == 0 {
 		return 0
 	}
-	return layers * kvHeads * (keyLen + valLen) * 2
+	return h.cacheLayers(layers) * kvHeads * (keyLen + valLen) * 2
+}
+
+// cacheLayers counts the layers that keep a context cache. Hybrid models mix in state-space layers that keep only a small fixed state.
+func (h Header) cacheLayers(layers uint64) uint64 {
+	a := h.Arch + "."
+	if n, ok := h.NonZero[a+"attention.head_count_kv"]; ok && n > 0 && n < layers {
+		return n
+	}
+	if every := h.Numbers[a+"full_attention_interval"]; every > 1 {
+		return (layers + every - 1) / every
+	}
+	if h.Numbers[a+"ssm.inner_size"] > 0 {
+		// Hybrid without a layout in the file (Qwen3-Next): one cache layer in every four.
+		return (layers + 3) / 4
+	}
+	return layers
 }
 
 // tagRef is a parsed Ollama model name.

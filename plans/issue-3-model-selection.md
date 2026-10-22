@@ -39,7 +39,7 @@ Start Copilot with:
   | `qwen3-coder:30b` | 17.3 GiB | 256k |
   | `qwen3.6:latest` | 21.1 GiB | 256k |
 
-- **Auto-pick:** the biggest shortlist model whose estimated memory need fits safely. The estimate is the download size plus the 64k KV cache plus headroom, counted against the right memory pool:
+- **Auto-pick:** the best-ranked shortlist model whose estimated memory need fits safely. List order sets the ranking; models under `[menu-only]` (extra mid-size, large, and huge models) are offered in the menu only when they fit, and are never auto-picked. The estimate is the download size plus the 64k KV cache plus headroom, counted against the right memory pool:
   - **NVIDIA:** VRAM.
   - **Apple Silicon:** about 75% of unified memory.
   - **Windows iGPU:** 50% of RAM.

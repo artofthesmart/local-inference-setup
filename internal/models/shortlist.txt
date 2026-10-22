@@ -4,11 +4,32 @@
 # Every entry is checked against Ollama's registry before it's offered: it must exist and support at least 64k tokens of context.
 # To use your own list without rebuilding, copy this file to the copilot-local settings folder (shown by `copilot-local model --help`).
 #
+# Auto-pick: the LAST model in the first section that fits your memory wins, so keep that section in order from smallest to best.
+# Models under [menu-only] can be chosen from the menu but are never picked automatically, and are hidden when they're too big for the computer.
+# "Fast" models are mixture-of-experts: only part of the model works on each word, so they run much faster than their size suggests.
+#
 # Started from the list tested in artofthesmart/dotfiles-bootstrap, plus qwen3.6 from this repo's README.
 
-llama3.1:8b        Small and widely supported; fits most laptops
-mistral-nemo:12b   Small, with a very long context window
-gpt-oss:20b        OpenAI's open model; strong at tool use
-devstral:24b       Mistral's coding-agent model
-qwen3-coder:30b    Strong coding model; needs a big GPU or Mac
-qwen3.6:latest     Strong all-rounder; needs a big GPU or Mac
+llama3.1:8b              Small and widely supported; fits most laptops
+mistral-nemo:12b         Small, with a very long context window
+gpt-oss:20b              OpenAI's open model; fast and strong at tool use
+devstral:24b             Mistral's coding-agent model
+qwen3-coder:30b          Fast, strong coding model; needs a big GPU or Mac
+qwen3.6:latest           Fast, strong all-rounder; needs a big GPU or Mac
+qwen3-coder-next:latest  Fast, top coding model; needs a 96 GB+ Mac or two big GPUs
+
+[menu-only]
+# Mid-size: about 20-25 GB of memory at 64k context. Good on 24-48 GB GPUs and 32-64 GB Macs.
+devstral-small-2:24b     Newer Devstral coding agent; very long context
+mistral-small3.2:24b     Mistral's general model; good at following instructions
+granite4:small-h         IBM's fast hybrid model; light on memory for long chats
+glm-4.7-flash:latest     Z.ai's fast coding and agent model
+nemotron-3-nano:30b      NVIDIA's fast hybrid model; huge context window
+qwen3.6:27b              Dense Qwen 3.6; a bit smarter than the default but slower
+# Large: about 50-70 GB. Good on 64-128 GB Macs or several GPUs.
+qwen3-next:80b           Fast general model; about 50 GB
+llama3.3:70b             Meta's dense 70B; capable but slow, about 60 GB
+gpt-oss:120b             OpenAI's big open model; fast for its size, about 66 GB
+# Huge: 90 GB and up. For 128 GB+ Macs and workstations.
+devstral-2:123b          Mistral's biggest coding agent; dense and slow, about 93 GB
+qwen3:235b               Very large fast model; needs about 145 GB

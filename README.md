@@ -17,7 +17,7 @@ Each guide ends with an **Advanced** section on switching from Ollama to [llama.
 The `copilot-local` tool starts Copilot CLI on a model running on your own computer. The first time, it sets everything up for you and asks once before changing anything:
 
 1. Installs Ollama if needed, sets a big enough context size, and turns off Ollama cloud.
-2. Checks your memory and graphics card, and picks the biggest model from a [short tested list](internal/models/shortlist.txt) that fits.
+2. Checks your memory and graphics card, and picks the best model that fits from a [tested list](internal/models/shortlist.txt). The list runs from 8 GB laptops up to 48 GB graphics cards and 128 GB Macs. Extra mid-size and large models can be chosen from the menu.
 3. Downloads the model and tests that it can really call tools, the way Copilot does.
 4. Starts Copilot, connected only to that model.
 

@@ -416,3 +416,25 @@ func TestModelNeedsOllama(t *testing.T) {
 		t.Fatalf("%d\n%s", code, out)
 	}
 }
+
+func TestMenuModelsHidesExtrasThatDontFit(t *testing.T) {
+	const gib = 1 << 30
+	list := []models.Info{
+		{Tag: "small:1b", Size: 2 * gib},
+		{Tag: "pick:8b", Size: 5 * gib},
+		{Tag: "big-auto:30b", Size: 40 * gib},
+		{Tag: "extra-fits:12b", Size: 7 * gib, MenuOnly: true},
+		{Tag: "extra-huge:235b", Size: 130 * gib, MenuOnly: true},
+		{Tag: "extra-downloaded:70b", Size: 40 * gib, MenuOnly: true},
+	}
+	b := hardware.Budget{Bytes: 16 * gib}
+	got := menuModels(list, list[1], b, 65536, []string{"extra-downloaded:70b"})
+	var tags []string
+	for _, m := range got {
+		tags = append(tags, m.Tag)
+	}
+	want := "pick:8b big-auto:30b extra-downloaded:70b extra-fits:12b small:1b"
+	if strings.Join(tags, " ") != want {
+		t.Errorf("got  %s\nwant %s", strings.Join(tags, " "), want)
+	}
+}
