@@ -21,10 +21,10 @@ jobs:
       - run: go test ./...
       - name: Check the launchers parse
         if: runner.os == 'Linux'
-        run: sh -n install.sh
+        run: sh -n install.sh && sh -n gemini-query.sh
       - name: Check the launchers parse
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $null = [scriptblock]::Create((Get-Content -Raw install.ps1))
-
+          $null = [scriptblock]::Create((Get-Content -Raw gemini-query.ps1))

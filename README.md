@@ -52,6 +52,17 @@ Useful options, for example `curl -fsSL …/install.sh | sh -s -- model --ask-ge
 
 The manual steps below do the same thing by hand.
 
+### Ask Gemini for model choices (no installation)
+
+These standalone scripts print a prompt with your CPU, RAM, GPU information, and free disk space. Paste the output into Gemini to ask for three local Ollama choices: **speed**, **balanced**, and **intelligence** (better reasoning over speed, but still usable on your hardware). The prompt asks Gemini to check current exact tags, tool calling, and memory needs at 64k context, and to say when no practical model fits.
+
+- **macOS and Linux:** `curl -fsSL https://raw.githubusercontent.com/artofthesmart/local-inference-setup/main/gemini-query.sh | sh`
+- **Windows (PowerShell):** `irm https://raw.githubusercontent.com/artofthesmart/local-inference-setup/main/gemini-query.ps1 | iex`
+
+From a local checkout, use `sh ./gemini-query.sh` or `powershell -NoProfile -ExecutionPolicy Bypass -File .\gemini-query.ps1`. To save the output instead, use `sh ./gemini-query.sh > gemini-query.txt` or `powershell -NoProfile -ExecutionPolicy Bypass -File .\gemini-query.ps1 > gemini-query.txt`.
+
+The scripts need no Go, Ollama, or Gemini API key. They do not contact Gemini, install anything, download models, or change settings; the remote one-liners only fetch the script itself. Missing hardware details are marked unknown. Check the output before sharing it with Gemini; no usernames, model paths, or project code are intentionally included. In WSL, run the PowerShell version on Windows if that is where Ollama runs. The existing `copilot-local model --ask-gemini` flow also requests all three choices, while keeping the balanced choice in its `MODEL:` copy-back line.
+
 ### Check the whole setup
 
 Run `copilot-local verify` after setup, or pass `verify` to either launcher above. It prints **PASS**, **WARN**, or **FAIL** for Ollama, cloud opt-out, a real model tool call, the context actually loaded, Copilot CLI environment variables, and VS Code's Ollama extension and documented user-level privacy settings. A fixed test prompt also runs through the real Copilot CLI with offline settings, no available tools, and an isolated temporary home and workspace. It does not install software, download models, or change your settings; it may load the selected model into memory.

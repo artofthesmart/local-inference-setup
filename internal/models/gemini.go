@@ -16,7 +16,7 @@ import (
 const GeminiURL = "https://gemini.google.com/app"
 
 // The wording comes from artofthesmart/dotfiles-bootstrap's setup-local-ai wizard, which was tested against real Gemini answers.
-var promptTemplate = template.Must(template.New("prompt").Funcs(template.FuncMap{"size": hardware.Size}).Parse(`Recommend a practical LOCAL Ollama model for GitHub Copilot agent mode (VS Code and Copilot CLI).
+var promptTemplate = template.Must(template.New("prompt").Funcs(template.FuncMap{"size": hardware.Size}).Parse(`Recommend three practical LOCAL Ollama model options for GitHub Copilot agent mode (VS Code and Copilot CLI).
 OS: {{.OS}}; architecture: {{.Arch}}
 CPU: {{.CPU}}{{if .Cores}} ({{.Cores}} threads){{end}}
 {{- if eq .OS "Windows"}}
@@ -61,17 +61,28 @@ is unknown, say so explicitly rather than guessing.
 REQUIRED RESPONSE FORMAT: Start your response with this copy-back line, before
 any greeting, explanation, heading, or analysis:
 MODEL: <exact local Ollama name:tag; no command, URL, backticks, or cloud model>
+Use the BALANCED choice in this copy-back line (or NONE if no balanced choice fits).
 This is the only value the user must copy into the setup tool. The tool
 already knows the exact registry size and fixes agent context at {{.Context}} tokens.
 Put ALL analysis, links, caveats and fallback choices AFTER this line.
 Do not invent a runnable recommendation if none is suitable:
 use MODEL: NONE and explain the blocker afterward.
 
-Compare ONLY the verified candidates above and explain which best fits this
-hardware. Recommend a primary and smaller fallback from that same list, with
-official model-page links, license/commercial-use caveats, realistic speed
-expectations, and memory headroom for the OS, the editor or terminal, model
-weights AND KV cache.
+Compare ONLY the verified candidates above and give THREE choices from that list:
+1. SPEED: prioritize responsive interactive agent loops and low latency while
+retaining useful coding and tool-calling ability.
+2. BALANCED: the best everyday tradeoff between speed and coding/reasoning quality.
+3. INTELLIGENCE: prioritize coding/reasoning quality over speed, while remaining
+usable for interactive local agent work on this hardware. Do not just pick the
+largest model that can barely load. Explain why the expected latency is usable.
+After the copy-back line, show a comparison table with each tier's exact tag,
+ollama pull command, quantization, memory estimate at {{.Context}} tokens,
+expected speed and tradeoff. Include current official model-page links,
+license/commercial-use caveats, and memory headroom for the OS, the editor or
+terminal, model weights AND KV cache. Label speed estimates and unknowns;
+do not invent hardware benchmarks. Account for MoE total weights, not just
+active parameters. Prefer distinct choices, but reuse a model with an explanation
+if fewer than three fit. Say NONE for any tier without a practical fit.
 Account for shared versus dedicated memory; do not add GPUs' VRAM together.
 Do not suggest cloud inference. Do not claim structured tool calling is verified:
 the tool will test the exact downloaded model locally.
