@@ -39,6 +39,8 @@ Useful options, for example `curl -fsSL …/install.sh | sh -s -- model --ask-ge
 | `model --ask-gemini` | Make a prompt about your computer to ask Gemini which model to use, then paste back its answer |
 | `model --check` | Re-test the model you used last |
 | `vscode` | Install the Ollama VS Code extension and configure local generation and privacy settings |
+| `verify` | Check Ollama, the selected model, an offline Copilot prompt, and VS Code; print fixes for failures |
+| `verify --skip-vscode` | Verify a CLI-only setup without requiring VS Code |
 | `ollama --dry-run` | Show what the Ollama setup would change, and change nothing |
 | `ollama --context 131072` | Use a different context length (default 65536) |
 | `ollama --undo` | Remove the Ollama settings the tool added (Ollama stays installed) |
@@ -49,6 +51,14 @@ Useful options, for example `curl -fsSL …/install.sh | sh -s -- model --ask-ge
 > On some work-managed Windows PCs, Microsoft Defender's ransomware protection blocks new, unsigned programs, and you'll see "Access is denied". Use the manual steps below, or ask your IT team. Signed Windows builds are tracked in the issues.
 
 The manual steps below do the same thing by hand.
+
+### Check the whole setup
+
+Run `copilot-local verify` after setup, or pass `verify` to either launcher above. It prints **PASS**, **WARN**, or **FAIL** for Ollama, cloud opt-out, a real model tool call, the context actually loaded, Copilot CLI environment variables, and VS Code's Ollama extension and documented user-level privacy settings. A fixed test prompt also runs through the real Copilot CLI with offline settings, no available tools, and an isolated temporary home and workspace. It does not install software, download models, or change your settings; it may load the selected model into memory.
+
+Use `copilot-local verify --skip-vscode` for CLI-only setup, `--profile "Local AI"` to check a particular VS Code profile, `--model gpt-oss:20b --context 65536` to override the saved selection, or `--timeout 5m` on slow hardware. Missing CLI environment variables are warnings because the launcher supplies them. Conflicting variables, provider overrides, failed tests, and missing VS Code configuration are failures, each with a suggested fix. The isolated prompt tests launcher-provided settings, not your saved Copilot settings. Exit status is **0** with no failures (warnings and manual steps may remain), **1** with failures, or **2** for invalid arguments.
+
+GitHub Desktop and the Copilot app still need the manual checks printed at the end. VS Code's selected chat model and workspace/policy overrides also need checking by hand. Passing this command is **not** proof that every application makes zero external requests.
 
 ## Shared setup: install Ollama
 
@@ -98,3 +108,7 @@ Facts in these guides were checked on 2026-10-21 against:
 - A live test of Copilot CLI offline mode against a mock OpenAI-compatible server.
 
 Claims that couldn't be verified are labeled **Unverified** where they appear. See [NOTES.md](NOTES.md) for project requirements, decisions, and open questions.
+
+### Development checks
+
+Run `go test ./...` and `go vet ./...`. With Copilot CLI installed, `COPILOT_LOCAL_CLI_TEST=1 go test ./internal/launch ./cmd/copilot-local -run 'TestProbeWithInstalledCLI|TestVerifyWithInstalledCLI' -count=1` additionally runs the actual CLI against local mock APIs, including wrong/empty-reply failures. It uses no GitHub credentials or real model downloads. The manually triggered e2e workflow exercises a real Ollama model.

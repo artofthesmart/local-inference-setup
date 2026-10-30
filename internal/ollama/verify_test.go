@@ -71,11 +71,19 @@ func TestVerifyCloudStillOn(t *testing.T) {
 	te := newTestEnv(t, linuxSystemd, true)
 	te.runner.Responses[showEnv] = "OLLAMA_CONTEXT_LENGTH=65536"
 	r := Verify(t.Context(), te.Env, 65536)
-	if c := find(t, r, "Ollama cloud off"); c.Status != Fail || !strings.Contains(c.Fix, "systemctl restart") {
+	if c := find(t, r, "Ollama cloud off"); c.Status != Fail || !strings.Contains(c.Fix, "systemctl restart") || !strings.Contains(c.Fix, "copilot-local ollama") {
 		t.Fatalf("got %+v", c)
 	}
 	if find(t, r, "Context length 65536").Status != Pass {
 		t.Error("context from systemd should pass")
+	}
+}
+
+func TestRestartFixForWindowsServerFromWSL(t *testing.T) {
+	te := newTestEnv(t, linuxPlain, true)
+	fix := restartFix(te.Env, &State{WindowsSideServer: true})
+	if !strings.Contains(fix, "On Windows") || !strings.Contains(fix, "system tray") || strings.Contains(fix, "ollama serve") {
+		t.Fatalf("incorrect restart instructions: %s", fix)
 	}
 }
 
