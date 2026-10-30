@@ -501,8 +501,9 @@ var allowed = []string{"llama3.1:8b", "gpt-oss:20b", "qwen3.6:latest"}
 
 func TestParseAnswer(t *testing.T) {
 	good := map[string]string{
-		"MODEL: gpt-oss:20b\n\nHere's why...":   "gpt-oss:20b",
-		"**MODEL:** `gpt-oss:20b`":              "gpt-oss:20b",
+		"MODEL: gpt-oss:20b\n\nHere's why...": "gpt-oss:20b",
+		"**MODEL:** `gpt-oss:20b`":            "gpt-oss:20b",
+		"MODEL: gpt-oss:20b\nSPEED: llama3.1:8b\nBALANCED: gpt-oss:20b\nINTELLIGENCE: qwen3.6:latest": "gpt-oss:20b",
 		"  gpt-oss:20b  ":                       "gpt-oss:20b",
 		"qwen3.6":                               "qwen3.6:latest",
 		"Sure!\nmodel: llama3.1:8b\nMore text.": "llama3.1:8b",
@@ -533,7 +534,7 @@ func TestPromptPerOS(t *testing.T) {
 	cands := []Info{{Tag: "gpt-oss:20b", Size: 13 * gib, Context: 131072}}
 	win := hardware.Hardware{OS: "windows", CPU: "Intel Ultra 7", RAM: 32 * gib, VisibleRAM: 31 * gib, GPUs: []hardware.GPU{{Name: "Intel Arc", Vendor: "intel", Integrated: true}}, FreeDisk: 100 * gib}
 	p := Prompt(win, cands, 65536)
-	for _, want := range []string{"OS: Windows", "Installed physical RAM: 32.0 GB", "Windows-visible physical RAM: 31.0 GB", "iGPU planning ceiling: up to 50% of installed RAM (16.0 GB)", "- gpt-oss:20b | DOWNLOAD 13.0 GB | VERIFIED_CONTEXT_TOKENS 131072", "MODEL: NONE", "at least 65536 tokens", "GitHub Copilot agent mode", "Free space where models are saved: 100.0 GB"} {
+	for _, want := range []string{"OS: Windows", "Installed physical RAM: 32.0 GB", "Windows-visible physical RAM: 31.0 GB", "iGPU planning ceiling: up to 50% of installed RAM (16.0 GB)", "- gpt-oss:20b | DOWNLOAD 13.0 GB | VERIFIED_CONTEXT_TOKENS 131072", "MODEL: NONE", "at least 65536 tokens", "GitHub Copilot agent mode", "Free space where models are saved: 100.0 GB", "1. SPEED:", "2. BALANCED:", "3. INTELLIGENCE:", "Use the BALANCED choice in this copy-back line", "Say NONE for any tier without a practical fit"} {
 		if !strings.Contains(p, want) {
 			t.Errorf("windows prompt missing %q\n%s", want, p)
 		}
