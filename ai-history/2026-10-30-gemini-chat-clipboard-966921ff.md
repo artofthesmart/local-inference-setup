@@ -3,7 +3,7 @@
 - Date: 2026-10-30 (UTC-07:00)
 - Session: 966921ff-3b06-4626-aead-f7bbd9dc6b08
 - Outcome: Broader standalone recommendations and optional ENTER-to-copy interaction.
-- References: #16 (merged); follow-up branch `feat/gemini-query-clipboard`.
+- References: #16 (merged), #17 (clipboard and session history).
 
 ## Summary
 
@@ -19,6 +19,6 @@ CHAT does not require tools or large agent context. AGENTIC requires supported, 
 
 ## Verification and follow-up
 
-Local `go test ./...`, `go vet ./...`, shell syntax, formatting, and whitespace checks passed. Shell clipboard fixtures cover five backends and failures. Real terminal checks confirmed ENTER-to-copy for direct and piped execution without including UI text in the copied query. Windows host execution policy blocked local script execution; PowerShell fixtures and clipboard interaction unit tests await Windows CI on the follow-up PR. No live model downloads or Gemini answers were tested.
+Local `go test ./...`, `go vet ./...`, shell syntax, formatting, and whitespace checks passed. Shell clipboard fixtures cover five backends and failures. Real terminal checks confirmed ENTER-to-copy for direct and piped execution without including UI text in the copied query. Windows host execution policy blocked local script execution; Windows CI passed the PowerShell fixtures and clipboard interaction unit tests. Initial macOS CI exposed older-shell parsing of a captured here-document; prompt rendering was moved into a function, with final CI pending. No live model downloads or Gemini answers were tested.
 
 Keep both branches until their work and history are integrated and no session needs them. Archive readiness requires final remote preservation and activity checks; host archive semantics are not established by this record.

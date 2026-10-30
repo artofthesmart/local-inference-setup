@@ -56,7 +56,8 @@ done
 disk=$(df -Pk "$disk_dir" 2>/dev/null | awk 'END {if (NR > 1 && $4 ~ /^[0-9]+$/) printf "%.1f GiB", $4 / 1048576}' || true)
 today=$(date +%Y-%m-%d)
 
-query=$(cat <<EOF
+print_query() {
+cat <<EOF
 Recommend the best LOCAL CHAT and AGENTIC models to download from Ollama as of $today.
 Use current official Ollama library/tag pages and model documentation, not a stale shortlist.
 Consider the full range of locally downloadable Ollama chat/generation models, not just tool-capable or coding models.
@@ -106,7 +107,8 @@ Do not add shared GPU memory to RAM, sum separate GPUs' VRAM, assume iGPU suppor
 Prefer three distinct choices within each group, but reuse a model with an explanation if hardware leaves fewer suitable options. Say NONE for any tier with no practical fit rather than forcing an unusable recommendation. AGENTIC may have no practical fit even when CHAT does.
 Start with separate CHAT and AGENTIC comparison tables (tier, exact tag, working context, memory at that context, estimated speed, tradeoff), then explain the choices with dated sources. If browsing or hardware facts are unavailable, say so and make recommendations conditional rather than claiming verification.
 EOF
-)
+}
+query=$(print_query)
 printf '%s\n' "$query"
 
 copy_query() {
