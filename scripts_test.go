@@ -36,6 +36,60 @@ func checkQuery(t *testing.T, output string, facts ...string) {
 	if strings.Contains(output, "65536") || strings.Contains(output, "memory at 64k") {
 		t.Error("prompt still contains the old agent context target")
 	}
+	if strings.Contains(output, "Press ENTER") || strings.Contains(output, "========") {
+		t.Error("noninteractive output contains clipboard UI")
+	}
+}
+
+func TestShellQueryClipboard(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX script is for macOS and Linux")
+	}
+	for _, tt := range []struct {
+		name, setup, tool string
+		ok                bool
+	}{
+		{"mac", "os=Darwin;", "pbcopy", true},
+		{"wsl", "os=Linux; COPY_TOOL=clip.exe;", "clip.exe", true},
+		{"wayland", "os=Linux; COPY_TOOL=wl-copy; WAYLAND_DISPLAY=test;", "wl-copy", true},
+		{"xclip", "os=Linux; COPY_TOOL=xclip;", "xclip", true},
+		{"xsel", "os=Linux; COPY_TOOL=xsel;", "xsel", true},
+		{"missing", "os=Linux;", "", false},
+		{"failure", "os=Darwin; pbcopy() { return 1; };", "", false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "clipboard")
+			t.Setenv("COPY_FILE", path)
+			if tt.tool != "" {
+				bin := t.TempDir()
+				stub := "#!/bin/sh\ncase \"$0\" in *xclip) [ \"$1 $2\" = '-selection clipboard' ] || exit 1;; *xsel) [ \"$1 $2\" = '--clipboard --input' ] || exit 1;; esac\ncat > \"$COPY_FILE\"\n"
+				if err := os.WriteFile(filepath.Join(bin, tt.tool), []byte(stub), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+			}
+			command := `
+uname() { case "$1" in -s) echo Darwin;; -m) echo x86_64;; esac; }
+sysctl() { return 1; }
+system_profiler() { return 1; }
+. ./gemini-query.sh >/dev/null
+COPY_TOOL=
+command() { [ "$2" = "$COPY_TOOL" ]; }
+query='only the query
+second line'
+` + tt.setup + "\ncopy_query"
+			out, err := exec.Command("sh", "-c", command).CombinedOutput()
+			if (err == nil) != tt.ok {
+				t.Fatalf("copy success=%v, want %v: %s", err == nil, tt.ok, out)
+			}
+			if tt.ok {
+				content, err := os.ReadFile(path)
+				if err != nil || string(content) != "only the query\nsecond line\n" {
+					t.Fatalf("clipboard content: %q, %v", content, err)
+				}
+			}
+		})
+	}
 }
 
 func TestShellQuery(t *testing.T) {
@@ -155,6 +209,38 @@ if ($ErrorActionPreference -ne $before) { throw 'Script changed caller error pre
 				t.Fatalf("script failed: %v\n%s", err, out)
 			}
 			checkQuery(t, string(out), append(tt.facts, "OS: Windows; architecture: AMD64")...)
+		})
+	}
+}
+
+func TestPowerShellQueryClipboard(t *testing.T) {
+	ps, err := exec.LookPath("pwsh")
+	if err != nil {
+		ps, err = exec.LookPath("powershell")
+	}
+	if err != nil {
+		t.Skip("PowerShell not installed")
+	}
+	for _, fail := range []bool{false, true} {
+		name, setup, want := "copy", "", "Copied!"
+		if fail {
+			name, setup, want = "failure", "throw 'Unavailable'", "Couldn't access the clipboard"
+		}
+		t.Run(name, func(t *testing.T) {
+			command := `
+$ErrorActionPreference='Stop'
+$ast=[System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD 'gemini-query.ps1'), [ref]$null, [ref]$null)
+$fn=$ast.Find({param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Copy-QueryOnEnter'}, $true)
+. ([scriptblock]::Create($fn.Extent.Text))
+function Read-Host { param($Prompt) Write-Host $Prompt; $script:read=$true; '' }
+function Set-Clipboard { param($Value) $script:copied=$Value; ` + setup + ` }
+Copy-QueryOnEnter 'only the query'
+if (-not $script:read -or $script:copied -ne 'only the query') { throw 'Clipboard interaction failed' }
+`
+			out, err := exec.Command(ps, "-NoProfile", "-NonInteractive", "-Command", command).CombinedOutput()
+			if err != nil || !strings.Contains(string(out), want) || !strings.Contains(string(out), "========") || !strings.Contains(string(out), "Press ENTER") {
+				t.Fatalf("clipboard UI failed: %v\n%s", err, out)
+			}
 		})
 	}
 }
