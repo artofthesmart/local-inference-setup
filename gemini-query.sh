@@ -1,5 +1,5 @@
 #!/bin/sh
-# Prints a hardware-aware prompt to paste into Gemini; no network calls or changes.
+# Prints a hardware-aware prompt; optionally copies it on ENTER. No network calls.
 set -eu
 
 os=$(uname -s)
@@ -56,6 +56,7 @@ done
 disk=$(df -Pk "$disk_dir" 2>/dev/null | awk 'END {if (NR > 1 && $4 ~ /^[0-9]+$/) printf "%.1f GiB", $4 / 1048576}' || true)
 today=$(date +%Y-%m-%d)
 
+print_query() {
 cat <<EOF
 Recommend the best LOCAL CHAT and AGENTIC models to download from Ollama as of $today.
 Use current official Ollama library/tag pages and model documentation, not a stale shortlist.
@@ -106,3 +107,36 @@ Do not add shared GPU memory to RAM, sum separate GPUs' VRAM, assume iGPU suppor
 Prefer three distinct choices within each group, but reuse a model with an explanation if hardware leaves fewer suitable options. Say NONE for any tier with no practical fit rather than forcing an unusable recommendation. AGENTIC may have no practical fit even when CHAT does.
 Start with separate CHAT and AGENTIC comparison tables (tier, exact tag, working context, memory at that context, estimated speed, tradeoff), then explain the choices with dated sources. If browsing or hardware facts are unavailable, say so and make recommendations conditional rather than claiming verification.
 EOF
+}
+query=$(print_query)
+printf '%s\n' "$query"
+
+copy_query() {
+  case "$os" in
+    Darwin) printf '%s\n' "$query" | pbcopy ;;
+    Linux)
+      if command -v clip.exe >/dev/null 2>&1; then
+        printf '%s\n' "$query" | clip.exe
+      elif [ -n "${WAYLAND_DISPLAY:-}" ] && command -v wl-copy >/dev/null 2>&1; then
+        printf '%s\n' "$query" | wl-copy
+      elif command -v xclip >/dev/null 2>&1; then
+        printf '%s\n' "$query" | xclip -selection clipboard
+      elif command -v xsel >/dev/null 2>&1; then
+        printf '%s\n' "$query" | xsel --clipboard --input
+      else
+        return 1
+      fi
+      ;;
+  esac
+}
+
+if [ -t 1 ] && [ -r /dev/tty ]; then
+  printf '\n%s\n%s' '============================================================' 'Press ENTER to copy the query to your clipboard (Ctrl+C to skip): ' >&2
+  if IFS= read -r reply </dev/tty; then
+    if copy_query 2>/dev/null; then
+      printf '%s\n' 'Copied! Paste into Gemini.' >&2
+    else
+      printf '%s\n' "Couldn't access the clipboard. Select and copy the query above manually." >&2
+    fi
+  fi
+fi

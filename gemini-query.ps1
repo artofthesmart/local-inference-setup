@@ -1,9 +1,19 @@
-# Prints a hardware-aware prompt to paste into Gemini; no network calls or changes.
+# Prints a hardware-aware prompt; optionally copies it on ENTER. No network calls.
 # Compatible with Windows PowerShell 5.1 and PowerShell 7.
 & {
   $ErrorActionPreference = 'Stop'
   function Format-Memory($Bytes) {
     if ($Bytes -gt 0) { '{0:F1} GiB' -f ($Bytes / 1GB) } else { 'unknown' }
+  }
+  function Copy-QueryOnEnter($Query) {
+    Write-Host "`n============================================================"
+    $null = Read-Host 'Press ENTER to copy the query to your clipboard (Ctrl+C to skip)'
+    try {
+      Set-Clipboard -Value $Query
+      Write-Host 'Copied! Paste into Gemini.'
+    } catch {
+      Write-Host "Couldn't access the clipboard. Select and copy the query above manually."
+    }
   }
 
   $cpu = 'unknown'
@@ -48,7 +58,7 @@
   $arch = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } elseif ($env:PROCESSOR_ARCHITECTURE) { $env:PROCESSOR_ARCHITECTURE } else { 'unknown' }
   $today = Get-Date -Format 'yyyy-MM-dd'
 
-  @"
+  $query = @"
 Recommend the best LOCAL CHAT and AGENTIC models to download from Ollama as of $today.
 Use current official Ollama library/tag pages and model documentation, not a stale shortlist.
 Consider the full range of locally downloadable Ollama chat/generation models, not just tool-capable or coding models.
@@ -99,4 +109,8 @@ Do not add shared GPU memory to RAM, sum separate GPUs' VRAM, assume iGPU suppor
 Prefer three distinct choices within each group, but reuse a model with an explanation if hardware leaves fewer suitable options. Say NONE for any tier with no practical fit rather than forcing an unusable recommendation. AGENTIC may have no practical fit even when CHAT does.
 Start with separate CHAT and AGENTIC comparison tables (tier, exact tag, working context, memory at that context, estimated speed, tradeoff), then explain the choices with dated sources. If browsing or hardware facts are unavailable, say so and make recommendations conditional rather than claiming verification.
 "@
+  $query
+  if ([Environment]::UserInteractive -and -not [Console]::IsOutputRedirected) {
+    Copy-QueryOnEnter $query
+  }
 }

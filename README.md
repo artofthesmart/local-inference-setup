@@ -59,7 +59,7 @@ These standalone scripts print a prompt with your CPU, RAM, GPU information, and
 - **macOS and Linux:** `curl -fsSL https://raw.githubusercontent.com/artofthesmart/local-inference-setup/main/gemini-query.sh | sh`
 - **Windows (PowerShell):** `irm https://raw.githubusercontent.com/artofthesmart/local-inference-setup/main/gemini-query.ps1 | iex`
 
-From a local checkout, use `sh ./gemini-query.sh` or `powershell -NoProfile -ExecutionPolicy Bypass -File .\gemini-query.ps1`. To save the output instead, use `sh ./gemini-query.sh > gemini-query.txt` or `powershell -NoProfile -ExecutionPolicy Bypass -File .\gemini-query.ps1 > gemini-query.txt`.
+From a local checkout, use `sh ./gemini-query.sh` or `powershell -NoProfile -ExecutionPolicy Bypass -File .\gemini-query.ps1`. In an interactive terminal, press **ENTER** after the separator to copy just the query to your clipboard. If clipboard access is unavailable, copy it manually. Noninteractive runs skip clipboard interaction. To save the output instead, use `sh ./gemini-query.sh > gemini-query.txt` or `powershell -NoProfile -ExecutionPolicy Bypass -File .\gemini-query.ps1 > gemini-query.txt`.
 
 The scripts need no Go, Ollama, or Gemini API key. They do not contact Gemini, install anything, download models, or change settings; the remote one-liners only fetch the script itself. Missing hardware details are marked unknown. Check the output before sharing it with Gemini; no usernames, model paths, or project code are intentionally included. In WSL, run the PowerShell version on Windows if that is where Ollama runs. The existing `copilot-local model --ask-gemini` flow also requests all three choices, while keeping the balanced choice in its `MODEL:` copy-back line.
 
