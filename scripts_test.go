@@ -14,13 +14,27 @@ func checkQuery(t *testing.T, output string, facts ...string) {
 	for _, want := range append([]string{
 		"1. SPEED:", "2. BALANCED:", "3. INTELLIGENCE:",
 		"remain usable for interactive local agent work",
-		"65536 context tokens", "weights plus cache", "at least 128 declared tools",
+		"131072 context tokens", "weights plus cache", "at least 128 declared tools",
+		"full range of locally downloadable Ollama chat/generation models",
+		"CHAT: Conversation", "AGENTIC: GitHub Copilot agent mode",
+		"Tool calling is NOT required for CHAT", "8192-16384 tokens",
+		"Do not apply AGENTIC tool-calling or context requirements to CHAT",
+		"For AGENTIC only:", "131072 tokens (128k, above 100k)",
+		"separate CHAT and AGENTIC comparison tables",
 		"Say NONE for any tier", "do not invent hardware benchmarks",
 		"ollama pull", "current official Ollama library/tag pages",
 	}, facts...) {
 		if !strings.Contains(output, want) {
 			t.Errorf("prompt missing %q:\n%s", want, output)
 		}
+	}
+	for _, tier := range []string{"1. SPEED:", "2. BALANCED:", "3. INTELLIGENCE:"} {
+		if got := strings.Count(output, tier); got != 2 {
+			t.Errorf("expected %q in both CHAT and AGENTIC, got %d occurrences", tier, got)
+		}
+	}
+	if strings.Contains(output, "65536") || strings.Contains(output, "memory at 64k") {
+		t.Error("prompt still contains the old agent context target")
 	}
 }
 

@@ -49,8 +49,9 @@
   $today = Get-Date -Format 'yyyy-MM-dd'
 
   @"
-Recommend the best LOCAL agentic coding models to download from Ollama as of $today.
+Recommend the best LOCAL CHAT and AGENTIC models to download from Ollama as of $today.
 Use current official Ollama library/tag pages and model documentation, not a stale shortlist.
+Consider the full range of locally downloadable Ollama chat/generation models, not just tool-capable or coding models.
 
 HARDWARE (automatically detected; unknown means unverified):
 OS: Windows; architecture: $arch
@@ -66,24 +67,36 @@ Memory/acceleration notes: Integrated GPUs share system RAM dynamically, not ext
 Free disk: $disk (OLLAMA_MODELS filesystem, or home filesystem if unset; the Ollama service may store models elsewhere)
 
 TASK:
-Give THREE choices for GitHub Copilot agent mode in VS Code and Copilot CLI:
+Give THREE choices in EACH of these two use-case groups (six recommendations total).
+These are use cases, not mutually exclusive model classes; a model may appear in both groups.
+
+CHAT: Conversation, explanations, writing, reasoning, and occasional coding without tool calls or autonomous actions.
+1. SPEED: prioritize responsive conversation and low latency while retaining useful answer quality.
+2. BALANCED: the best everyday tradeoff between speed and general answer quality on this hardware.
+3. INTELLIGENCE: prioritize reasoning and answer quality over speed, while remaining usable for interactive local chat.
+Tool calling is NOT required for CHAT. Recommend an explicit practical working context for each choice, starting around 8192-16384 tokens if appropriate for the hardware and task; larger contexts are welcome when useful and feasible.
+Do not exclude CHAT candidates for lacking tool support or a 128k context window. Chat-only behavior comes from the client not supplying or executing tools, not from choosing a model that cannot call tools.
+
+AGENTIC: GitHub Copilot agent mode in VS Code and Copilot CLI, with reliable structured tool calling and multi-step coding work.
 1. SPEED: prioritize responsive interactive agent loops and low latency, while retaining useful coding and tool-calling ability.
 2. BALANCED: the best everyday tradeoff between speed and coding/reasoning quality on this hardware.
 3. INTELLIGENCE: prioritize coding/reasoning quality over speed, but remain usable for interactive local agent work on this hardware. Do not just choose the largest model that can barely load.
+Use 131072 tokens (128k, above 100k) as the required AGENTIC working context.
 
 For EACH choice provide:
 - An exact, currently downloadable local Ollama name:tag and its ollama pull command.
-- Official source links verifying that exact tag, quantization, download size, supported context, tool calling, and license/commercial-use caveats.
-- Estimated model-weight memory PLUS KV-cache/runtime memory at 65536 tokens, with headroom for the OS, editor, and other apps; distinguish disk size from runtime memory.
-- Expected acceleration/offloading, time to first token, generation speed, and practical agent-loop latency. Label estimates and unknowns; do not invent hardware benchmarks. Explain what makes the intelligence option still usable.
-- Evidence for reliable structured tool calls, complex JSON schemas, and choosing among at least 128 declared tools. A tools label alone is not proof; state what still needs local testing.
-- The main tradeoff and a short local validation plan, including checking loaded context and structured tool_calls.
+- Official source links verifying that exact tag, quantization, download size, supported context, and license/commercial-use caveats; also verify tool calling for AGENTIC.
+- The recommended working context and estimated model-weight memory PLUS KV-cache/runtime memory at that context (131072 tokens for AGENTIC), with headroom for the OS, editor, and other apps; distinguish disk size from runtime memory.
+- Expected acceleration/offloading, time to first token, generation speed, and practical chat or agent-loop latency as appropriate. Label estimates and unknowns; do not invent hardware benchmarks. Explain what makes each intelligence option still usable.
+- For AGENTIC only: evidence for reliable structured tool calls, complex JSON schemas, and choosing among at least 128 declared tools. A tools label alone is not proof; state what still needs local testing.
+- The main tradeoff and a short local validation plan: check loaded context and representative chat quality for CHAT; check loaded context and structured tool_calls for AGENTIC.
 
 REQUIREMENTS:
 Only local inference with models downloadable from Ollama; no cloud tags, hosted APIs, or Hugging Face-only models.
-Each choice must natively support at least 65536 context tokens AND fit weights plus cache at that context; raising num_ctx does not establish support. Do not lower context just to make a model fit.
+Each AGENTIC choice must natively support at least 131072 context tokens AND fit weights plus cache at that context; raising num_ctx does not establish support. Do not lower the AGENTIC context just to make a model fit.
+Each CHAT choice must support its recommended working context AND fit weights plus cache at that context. Do not apply AGENTIC tool-calling or context requirements to CHAT.
 Do not add shared GPU memory to RAM, sum separate GPUs' VRAM, assume iGPU support, or treat all system RAM as usable VRAM. Account for memory bandwidth, CPU offloading, and MoE total weights, not just active parameters.
-Prefer three distinct choices, but reuse a model with an explanation if hardware leaves fewer suitable options. Say NONE for any tier with no practical fit rather than forcing an unusable recommendation.
-Start with a comparison table (tier, exact tag, memory at 64k, estimated speed, tradeoff), then explain the choices with dated sources. If browsing or hardware facts are unavailable, say so and make recommendations conditional rather than claiming verification.
+Prefer three distinct choices within each group, but reuse a model with an explanation if hardware leaves fewer suitable options. Say NONE for any tier with no practical fit rather than forcing an unusable recommendation. AGENTIC may have no practical fit even when CHAT does.
+Start with separate CHAT and AGENTIC comparison tables (tier, exact tag, working context, memory at that context, estimated speed, tradeoff), then explain the choices with dated sources. If browsing or hardware facts are unavailable, say so and make recommendations conditional rather than claiming verification.
 "@
 }
